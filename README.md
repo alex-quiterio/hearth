@@ -37,11 +37,14 @@ anything, every single time. The server listens on 127.0.0.1 only.
 
 ## Config
 
+Copy `.env.example` to `.env` (Bun loads it on its own; `.env` is git-ignored).
+
 | Env | Default |
 | --- | --- |
 | `HEARTH_VAULT` | the Obsidian vault named `pandora`, found in Obsidian's own config |
 | `HEARTH_VAULT_NAME` | `pandora` |
 | `HEARTH_PORT` | `4747` |
+| `ANTHROPIC_API_KEY` | unset: runs on your Claude Code login. Set, every turn bills that API key |
 
 ## Testing
 
