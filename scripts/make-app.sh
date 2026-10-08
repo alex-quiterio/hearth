@@ -20,6 +20,10 @@ for s in 16 32 128 256 512; do
   sips -s format png -z $((s*2)) $((s*2)) "$src" --out "$tmp/icon.iconset/icon_${s}x${s}@2x.png" >/dev/null
 done
 iconutil -c icns "$tmp/icon.iconset" -o "$app/Contents/Resources/applet.icns"
+# Recent macOS reads CFBundleIconName from Assets.car first, which holds the generic
+# script icon; drop both so applet.icns (CFBundleIconFile) is the icon.
+/usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "$app/Contents/Info.plist" 2>/dev/null || true
+rm -f "$app/Contents/Resources/Assets.car"
 rm -rf "$tmp"
 # The icon changed the bundle after osacompile signed it: re-sign, then make Finder notice.
 codesign --force --deep -s - "$app"
