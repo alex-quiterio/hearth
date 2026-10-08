@@ -60,7 +60,7 @@ function activity(tool: string, input: Record<string, unknown>): string {
   return `Using ${tool}`;
 }
 
-function summarize(tool: string, input: Record<string, unknown>): string {
+export function summarize(tool: string, input: Record<string, unknown>): string {
   if (tool === "Bash") return String(input.command ?? "");
   if (tool === "Skill") return String(input.skill ?? input.name ?? "");
   if (typeof input.file_path === "string") return input.file_path;

@@ -3,6 +3,7 @@ import { watch } from "node:fs";
 import { findVault, state, lastChange, kinState, kinPeople, PATHS } from "./vault";
 import { waterPlant } from "./garden";
 import { chat, answerPermission, stop } from "./agent";
+import { sessions, transcript, forget } from "./history";
 
 const vault = await findVault();
 const PORT = Number(process.env.HEARTH_PORT ?? 4747);
@@ -95,6 +96,15 @@ Bun.serve({
       POST: async (req) => {
         const { id, allow } = (await req.json()) as { id: string; allow: boolean };
         return Response.json({ ok: answerPermission(id, !!allow) });
+      },
+    },
+
+    "/api/sessions": async () => Response.json(await sessions()),
+    "/api/sessions/:id": {
+      GET: async (req) => Response.json(await transcript(req.params.id)),
+      DELETE: async (req) => {
+        await forget(req.params.id);
+        return Response.json({ ok: true });
       },
     },
 

@@ -566,6 +566,7 @@ const hasThread = () => !!sessionId || !!$(".msg", $("#log"));
 
 function startNew(prompt) {
   openChat();
+  if (!$("#history").hidden) showHistory(false);
   proposal?.remove();
   const thread = hasThread();
   proposal = append("proposal", `
@@ -720,3 +721,71 @@ $("#shutdown").onclick = async () => {
     <p class="muted">The server is stopped. Open <strong>Hearth.app</strong> on your Desktop to light it again.</p></main>`;
   document.title = "Hearth (stopped)";
 };
+
+/* ---------- history: previous conversations, read back from Claude Code's sessions ---------- */
+
+const when = (ms) => {
+  const d = new Date(ms), now = new Date();
+  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const days = Math.round((new Date(now.toDateString()) - new Date(d.toDateString())) / 86400000);
+  if (days === 0) return `Today ${time}`;
+  if (days === 1) return `Yesterday ${time}`;
+  return d.toLocaleDateString([], { day: "numeric", month: "short", ...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}) }) + ` ${time}`;
+};
+
+function showHistory(on) {
+  $("#history").hidden = !on;
+  $("#log").hidden = on;
+  $("#historyBtn").setAttribute("aria-expanded", String(on));
+  $("#historyBtn").textContent = on ? "Back" : "History";
+  if (on) loadHistory();
+}
+
+async function loadHistory() {
+  const box = $("#history");
+  box.innerHTML = `<p class="muted hist-empty">Reading past conversations…</p>`;
+  let list = [];
+  try { list = await (await fetch("/api/sessions")).json(); } catch {}
+  if (!list.length) { box.innerHTML = `<p class="muted hist-empty">No previous conversations yet.</p>`; return; }
+  box.innerHTML = list.map((x) => `
+    <div class="hist-row${x.id === sessionId ? " current" : ""}" data-id="${esc(x.id)}">
+      <button class="hist-open" data-id="${esc(x.id)}">
+        <span class="hist-title">${esc(x.title)}</span>
+        <span class="hist-meta muted">${esc(when(x.lastModified))}${x.firstPrompt && x.firstPrompt !== x.title ? ` · ${esc(x.firstPrompt.slice(0, 80))}` : ""}${x.id === sessionId ? " · open now" : ""}</span>
+      </button>
+      <button class="hist-del ghost" data-del="${esc(x.id)}" title="Delete this conversation" aria-label="Delete ${esc(x.title)}">✕</button>
+    </div>`).join("");
+}
+
+async function openSession(id) {
+  if (running) { toast("Claude is still working. Stop the turn first."); return; }
+  if (id === sessionId) { showHistory(false); return; }
+  if ($(".msg", $("#log")) && !confirm("Open this conversation? The one in the panel stays in History.")) return;
+  const lines = await (await fetch(`/api/sessions/${encodeURIComponent(id)}`)).json();
+  showHistory(false);
+  sessionId = id;
+  proposal = null;
+  bubble = null; bubbleText = "";
+  $("#log").innerHTML = `<p class="muted hint">An earlier conversation. Write below to continue it.</p>`;
+  for (const l of lines) {
+    if (l.kind === "user") append("msg user", esc(l.text));
+    else if (l.kind === "assistant") append("msg assistant", light(l.text));
+    else append("tool", `↳ ${esc(l.text)}`);
+  }
+  $("#chatStatus").textContent = "continuing";
+}
+
+$("#historyBtn").onclick = () => showHistory($("#history").hidden);
+$("#history").addEventListener("click", async (e) => {
+  const del = e.target.closest("[data-del]");
+  if (del) {
+    if (!confirm("Delete this conversation for good? It is removed from Claude Code too.")) return;
+    const id = del.dataset.del;
+    await fetch(`/api/sessions/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (id === sessionId) { sessionId = null; $("#log").innerHTML = `<p class="muted hint">New conversation.</p>`; }
+    loadHistory();
+    return;
+  }
+  const open = e.target.closest(".hist-open");
+  if (open) openSession(open.dataset.id);
+});

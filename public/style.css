@@ -327,3 +327,16 @@ body.claude-working #send { display: none; }
 .proposal .chat-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .proposal button:disabled { opacity: .5; cursor: not-allowed; }
 .proposal-note { margin: 0; font-size: 12.5px; }
+
+/* History: previous conversations */
+.history { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.hist-empty { padding: 8px 4px; }
+.hist-row { display: flex; align-items: stretch; gap: 4px; border-radius: 12px; background: var(--surface-2); }
+.hist-row.current { outline: 1.5px solid var(--moss); }
+.hist-open { flex: 1; min-width: 0; text-align: left; background: transparent; border: 0; padding: 9px 11px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; color: var(--ink); border-radius: 12px; }
+.hist-open:hover, .hist-open:focus-visible { background: color-mix(in srgb, var(--moss) 10%, transparent); }
+.hist-title { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-meta { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-del { border: 0; padding: 0 12px; color: var(--muted); border-radius: 12px; }
+.hist-del:hover { color: var(--clay-ink); }
+.history[hidden], .chat-log[hidden] { display: none; }
