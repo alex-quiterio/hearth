@@ -32,7 +32,7 @@ const READ_ONLY = new Set(["Read", "Glob", "Grep", "Skill", "ToolSearch", "WebSe
 const BEEPER_WRITE = /send|edit|delete|archive|mark|react|set_|create|update|remind|pin|mute/i;
 
 /** Pre-approve what the skills do all day (read, and write notes through the Obsidian CLI); ask for the rest. */
-function autoAllowed(tool: string, input: Record<string, unknown>): boolean {
+export function autoAllowed(tool: string, input: Record<string, unknown>): boolean {
   if (READ_ONLY.has(tool)) return true;
   if (tool === "Bash") {
     const cmd = String(input.command ?? "").trim();

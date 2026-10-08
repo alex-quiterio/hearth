@@ -42,3 +42,14 @@ anything, every single time. The server listens on 127.0.0.1 only.
 | `HEARTH_VAULT` | the Obsidian vault named `pandora`, found in Obsidian's own config |
 | `HEARTH_VAULT_NAME` | `pandora` |
 | `HEARTH_PORT` | `4747` |
+
+## Testing
+
+| Command | What it checks | Costs |
+| --- | --- | --- |
+| `bun test` | the vault parser and the permission rules, on a made-up vault in `test/fixtures` | nothing |
+| `bun run demo` | the whole dashboard on that made-up vault, at http://127.0.0.1:4748 | nothing, until you chat |
+| `bun run smoke` | a running server end to end: page, your real vault, one chat turn | one short turn |
+
+The demo only fakes what the dashboard *reads*. A skill started from its chat still works
+on the real `pandora`, so in the demo stick to its "Say hello" button.

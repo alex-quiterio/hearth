@@ -60,13 +60,18 @@ function sections(body: string): { heading: string; text: string }[] {
   return out.filter((s) => s.heading || s.text);
 }
 
+// A ring heading reads "<emoji> <Ring> (<gloss>)"; match on the first word only, so
+// "Drifting (was close…)" stays Drifting and "New ground" is not the New ring.
 const RINGS = [
-  { key: "core", match: /core/i },
-  { key: "close", match: /close/i },
-  { key: "warm", match: /warm/i },
-  { key: "drifting", match: /drift/i },
-  { key: "new", match: /\bnew\b/i },
+  { key: "core", match: /^core$/i },
+  { key: "close", match: /^close$/i },
+  { key: "warm", match: /^warm$/i },
+  { key: "drifting", match: /^drifting$/i },
+  { key: "new", match: /^new$/i },
 ] as const;
+
+const ringWord = (heading: string) =>
+  heading.replace(/\(.*?\)/g, "").replace(/^[^\p{L}]+/u, "").trim();
 
 const PLACES: Record<string, string> = { "🏙️": "here", "🌳": "land", "🌊": "lisbon", "✈️": "far" };
 
@@ -138,8 +143,8 @@ export async function kinState(vault: string) {
       intro = s.text.replace(/^# .+\n?/, "").trim();
       continue;
     }
-    const ring = RINGS.find((r) => r.match.test(s.heading.replace(/\(.*?\)/g, "")));
-    if (ring && !/weak/i.test(s.heading)) {
+    const ring = RINGS.find((r) => r.match.test(ringWord(s.heading)));
+    if (ring) {
       const lines = s.text.split("\n");
       const people: Person[] = [];
       const introLines: string[] = [];
