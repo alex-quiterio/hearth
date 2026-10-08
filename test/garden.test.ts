@@ -86,17 +86,17 @@ describe("watering", () => {
   test("fills this week's empty outcome", async () => {
     const { dir, who } = await copy();
     await waterPlant(dir, who("Sol Novo"), "she is in", TODAY);
-    expect(await log(dir)).toContain("Gesture: ask about the Friday class. Outcome: watered 2026-10-09, she is in.");
+    expect(await log(dir)).toContain("Gesture: ask about the Friday class. Outcome: tended 2026-10-09, she is in.");
     const s = await state(dir, TODAY);
     expect(s.garden.thisWeek[0]!.done).toBe(true);
     expect(plant(s, "Sol Novo")).toMatchObject({ lastTended: "2026-10-09", thirst: "fresh" });
   });
 
-  test("someone outside this week gets a Watered line in this week's block", async () => {
+  test("someone outside this week gets a Tended line in this week's block", async () => {
     const { dir, who } = await copy();
     await waterPlant(dir, who("Lena"), "", TODAY);
     const text = await log(dir);
-    expect(text).toContain("- **Carrying · Rui Teste** (🌳). Gesture: Sunday lunch. Outcome: went, 2026-10-07.\n- **Watered · Lena** 2026-10-09, from Hearth.");
+    expect(text).toContain("- **Carrying · Rui Teste** (🌳). Gesture: Sunday lunch. Outcome: went, 2026-10-07.\n- **Tended · Lena** 2026-10-09, from Hearth.");
     expect(text).toContain("updated: 2026-10-09");
     const s = await state(dir, TODAY);
     expect(plant(s, "Lena")).toMatchObject({ lastTended: "2026-10-09", lastTendedFrom: "water" });
@@ -106,7 +106,7 @@ describe("watering", () => {
   test("with no block this week, starts a small one", async () => {
     const { dir, who } = await copy();
     await waterPlant(dir, who("Ana Exemplo"), "", "2026-10-20");
-    expect(await log(dir)).toContain("## 2026-W43 · 2026-10-20\n\nSmall waterings from Hearth, between tending runs.\n\n- **Watered · [[Ana Exemplo]]** 2026-10-20, from Hearth.");
+    expect(await log(dir)).toContain("## 2026-W43 · 2026-10-20\n\nTended from Hearth, between tending runs.\n\n- **Tended · [[Ana Exemplo]]** 2026-10-20, from Hearth.");
   });
 
   test("an already filled outcome is never overwritten", async () => {
@@ -114,6 +114,6 @@ describe("watering", () => {
     await waterPlant(dir, who("Rui Teste"), "", TODAY);
     const text = await log(dir);
     expect(text).toContain("Outcome: went, 2026-10-07.");
-    expect(text).toContain("- **Watered · Rui Teste** 2026-10-09, from Hearth.");
+    expect(text).toContain("- **Tended · Rui Teste** 2026-10-09, from Hearth.");
   });
 });

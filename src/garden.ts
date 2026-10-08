@@ -60,7 +60,7 @@ export function parseTending(text: string): Block[] {
         line: i,
         text: l.slice(2),
         gesture: rest.match(/Gesture:\s*(.*?)(?:\s*Outcome:|$)/)?.[1]?.trim() ?? "",
-        outcome: rest.match(/Outcome:\s*(.*)$/)?.[1]?.trim() ?? (e[1]!.trim() === "Watered" ? "watered" : ""),
+        outcome: rest.match(/Outcome:\s*(.*)$/)?.[1]?.trim() ?? (e[1]!.trim() === "Tended" ? "tended" : ""),
       });
     } else if (!cur.entries.length && l.trim()) cur.intro += l + "\n";
   });
@@ -72,9 +72,9 @@ const currentBlock = (blocks: Block[], today: string) =>
   blocks.filter((b) => days(b.date, today) >= 0 && days(b.date, today) <= 6).at(-1) ?? null;
 
 /** When each entry counts as water: an outcome's own date if it has one, else its block's. */
-function wateredOn(e: Entry, b: Block): string | null {
+function tendedOn(e: Entry, b: Block): string | null {
   if (!e.outcome) return null;
-  return e.outcome.match(/(\d{4}-\d{2}-\d{2})/)?.[1] ?? (e.kind === "Watered" ? e.text.match(/(\d{4}-\d{2}-\d{2})/)?.[1] : null) ?? b.date;
+  return e.outcome.match(/(\d{4}-\d{2}-\d{2})/)?.[1] ?? (e.kind === "Tended" ? e.text.match(/(\d{4}-\d{2}-\d{2})/)?.[1] : null) ?? b.date;
 }
 
 // ---- Other sources of "last tended" ---------------------------------------------------
@@ -148,14 +148,14 @@ export async function garden(vault: string, people: Person[], config: Config, to
     const prev = water.get(k);
     if (!prev || date > prev.date) water.set(k, { date, from });
   };
-  for (const b of blocks) for (const e of b.entries) offer(e.name, wateredOn(e, b), e.kind === "Watered" ? "water" : "tending");
+  for (const b of blocks) for (const e of b.entries) offer(e.name, tendedOn(e, b), e.kind === "Tended" ? "water" : "tending");
   for (const [k, t] of convo) offer(k, t.lastSent, "thread");
   for (const p of people) offer(p.name, mapDate(p.note, today), "map");
 
   const byName = <T extends { name: string }>(list: T[]) => new Map(list.map((x) => [norm(x.name), x]));
   const pinned = byName(config.pinned ?? []);
   const watch = byName(config.watch ?? []);
-  const planned = (week?.entries ?? []).filter((e) => e.kind !== "Watered");
+  const planned = (week?.entries ?? []).filter((e) => e.kind !== "Tended");
   const thisWeek = new Set(planned.map((e) => norm(e.name)));
 
   const plants = people.map((p) => {
@@ -184,7 +184,7 @@ export async function garden(vault: string, people: Person[], config: Config, to
   for (const b of blocks) {
     activeDays.add(b.date);
     for (const e of b.entries) {
-      const d = wateredOn(e, b);
+      const d = tendedOn(e, b);
       if (d) activeDays.add(d);
     }
   }
@@ -213,11 +213,11 @@ export async function garden(vault: string, people: Person[], config: Config, to
   };
 }
 
-// ---- Watering: the one thing Hearth writes --------------------------------------------
+// ---- Marking someone tended: the one thing Hearth writes --------------------------------------------
 
 /**
  * Record that Alex tended someone today, in the Tending log kin:tend already reads.
- * Fills the person's empty Outcome in this week's block, or adds a "Watered" line.
+ * Fills the person's empty Outcome in this week's block, or adds a "Tended" line.
  */
 export async function waterPlant(vault: string, person: Person, note = "", today = iso(new Date())) {
   const file = Bun.file(join(vault, PATHS.tendingLog));
@@ -225,24 +225,24 @@ export async function waterPlant(vault: string, person: Person, note = "", today
     ? await file.text()
     : `---\ntags: [kin]\ntype:\n  - tending-log\nupdated: ${today}\n---\n# Tending log\n\nThree people a week, one gesture each. Next week's run fills in the outcome. See [[Kin map]].\n`;
   const clean = note.replace(/\s+/g, " ").trim().slice(0, 200);
-  const outcome = `watered ${today}${clean ? `, ${clean}` : ""}.`;
+  const outcome = `tended ${today}${clean ? `, ${clean}` : ""}.`;
   const lines = text.split("\n");
   const week = currentBlock(parseTending(text), today);
-  const entry = week?.entries.find((e) => norm(e.name) === norm(person.name) && e.kind !== "Watered");
+  const entry = week?.entries.find((e) => norm(e.name) === norm(person.name) && e.kind !== "Tended");
 
   if (entry && !entry.outcome) {
     lines[entry.line] = lines[entry.line]!.replace(/Outcome:\s*$/, `Outcome: ${outcome}`);
     if (lines[entry.line]!.endsWith(entry.text)) lines[entry.line] += ` Outcome: ${outcome}`;
   } else {
     const who = person.linked ? `[[${person.name}]]` : person.name;
-    const line = `- **Watered · ${who}** ${today}, from Hearth.${clean ? ` ${clean}` : ""}`;
+    const line = `- **Tended · ${who}** ${today}, from Hearth.${clean ? ` ${clean}` : ""}`;
     if (week) {
       let at = week.end;
       while (at > week.start && !lines[at - 1]!.trim()) at--;
       lines.splice(at, 0, line);
     } else {
       while (lines.length && !lines.at(-1)!.trim()) lines.pop();
-      lines.push("", `## ${isoWeek(today)} · ${today}`, "", "Small waterings from Hearth, between tending runs.", "", line);
+      lines.push("", `## ${isoWeek(today)} · ${today}`, "", "Tended from Hearth, between tending runs.", "", line);
     }
   }
   text = lines.join("\n").replace(/^updated: .*$/m, `updated: ${today}`);
