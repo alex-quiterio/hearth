@@ -556,14 +556,56 @@ function setRunning(on, status = "") {
     $("#chatStatus").textContent = status || (sessionId ? "listening" : "");
   }
   updateRailDot();
+  syncProposal();
 }
 
+/* Buttons never send on their own: they propose a prompt, and Alex confirms where it goes.
+   One wrong click must not replace the conversation he is in. */
+let proposal = null;
+const hasThread = () => !!sessionId || !!$(".msg", $("#log"));
+
 function startNew(prompt) {
-  if (running) { openChat(); append("msg error", "A turn is still running. Stop it first."); return; }
-  sessionId = null;
-  $("#log").innerHTML = "";
   openChat();
-  send(prompt);
+  proposal?.remove();
+  const thread = hasThread();
+  proposal = append("proposal", `
+    <div class="proposal-head"><strong>Send this to Claude?</strong>
+      <span class="muted">${thread ? "You are in a conversation." : "Edit it first if you like."}</span></div>
+    <textarea rows="2" aria-label="Prompt to send"></textarea>
+    <div class="chat-buttons">
+      <button type="button" class="ghost" data-cancel>Cancel</button>
+      ${thread ? `<button type="button" class="ghost" data-here>Send in this conversation</button>` : ""}
+      <button type="button" class="primary" data-new>${thread ? "Start new conversation" : "Send"}</button>
+    </div>
+    <p class="muted proposal-note" hidden>Claude is still working. You can send when the turn ends.</p>`);
+  const card = proposal;
+  const box = $("textarea", card);
+  box.value = prompt;
+  box.style.height = Math.min(160, box.scrollHeight + 4) + "px";
+  const go = (fresh) => {
+    const text = box.value.trim();
+    if (!text || running) return;
+    card.remove(); proposal = null;
+    if (fresh) { sessionId = null; $("#log").innerHTML = ""; }
+    send(text);
+  };
+  const cancel = () => { card.remove(); proposal = null; };
+  $("[data-new]", card).onclick = () => go(true);
+  $("[data-here]", card)?.addEventListener("click", () => go(false));
+  $("[data-cancel]", card).onclick = cancel;
+  box.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); cancel(); }
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); go(true); }
+  });
+  syncProposal();
+  box.focus();
+}
+
+/** While a turn runs, a waiting proposal can be read and edited but not sent. */
+function syncProposal() {
+  if (!proposal) return;
+  proposal.querySelectorAll("[data-new],[data-here]").forEach((b) => (b.disabled = running));
+  $(".proposal-note", proposal).hidden = !running;
 }
 
 async function send(message) {
@@ -654,6 +696,8 @@ $("#input").addEventListener("keydown", (e) => {
 $("#stop").onclick = () => fetch("/api/stop", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
 $("#newChat").onclick = () => {
   if (running) return;
+  if ($(".msg", $("#log")) && !confirm("Start a new conversation? This one stays in Claude Code's history but leaves this panel.")) return;
+  proposal = null;
   sessionId = null;
   $("#log").innerHTML = `<p class="muted hint">New conversation.</p>`;
   setRunning(false);

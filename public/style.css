@@ -318,3 +318,12 @@ body.claude-working #send { display: none; }
 .power { position: absolute; top: 4px; right: 0; font-size: 12.5px; padding: 5px 11px; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; }
 .power:hover { color: var(--clay-ink); border-color: var(--clay); }
 .stopped { max-width: 520px; margin: 18vh auto; padding: 0 16px; text-align: center; }
+
+/* A prompt from a button, waiting for Alex to confirm where it goes */
+.proposal { align-self: stretch; padding: 12px; border-radius: 14px; background: var(--surface); border: 1.5px dashed var(--clay); display: flex; flex-direction: column; gap: 8px; }
+.proposal-head { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; font-size: 14px; }
+.proposal-head .muted { font-size: 12.5px; }
+.proposal textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); resize: vertical; }
+.proposal .chat-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.proposal button:disabled { opacity: .5; cursor: not-allowed; }
+.proposal-note { margin: 0; font-size: 12.5px; }
