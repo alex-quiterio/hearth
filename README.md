@@ -8,6 +8,10 @@ bun install
 bun start            # http://127.0.0.1:4747
 ```
 
+Or build a double-clickable launcher with the flame icon: `scripts/make-app.sh` puts
+`Hearth.app` on the Desktop. It opens the page, starting the server first if needed
+(log in `~/Library/Logs/hearth.log`).
+
 ## How it fits together
 
 ```
