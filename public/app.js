@@ -789,3 +789,52 @@ $("#history").addEventListener("click", async (e) => {
   const open = e.target.closest(".hist-open");
   if (open) openSession(open.dataset.id);
 });
+
+/* ---------- resizable conversation panel ---------- */
+
+const CHAT_W = { min: 300, def: 420 };
+const maxChatW = () => Math.max(CHAT_W.min, Math.min(1100, window.innerWidth - 480)); // keep the page usable
+function setChatWidth(w, save = true) {
+  const px = Math.round(Math.min(maxChatW(), Math.max(CHAT_W.min, w)));
+  document.documentElement.style.setProperty("--chat-w", px + "px");
+  resizer.setAttribute("aria-valuenow", String(px));
+  if (save) try { localStorage.setItem("hearth.chatWidth", String(px)); } catch {}
+  return px;
+}
+const resizer = document.createElement("div");
+resizer.className = "chat-resize";
+Object.assign(resizer, { tabIndex: 0, title: "Drag to resize · double-click to reset" });
+resizer.setAttribute("role", "separator");
+resizer.setAttribute("aria-orientation", "vertical");
+resizer.setAttribute("aria-label", "Resize the conversation panel");
+resizer.setAttribute("aria-valuemin", String(CHAT_W.min));
+$("#chat").prepend(resizer);
+
+let saved = CHAT_W.def;
+try { saved = Number(localStorage.getItem("hearth.chatWidth")) || CHAT_W.def; } catch {}
+setChatWidth(saved, false);
+
+resizer.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  resizer.setPointerCapture(e.pointerId);
+  document.body.classList.add("resizing");
+  const move = (ev) => setChatWidth(window.innerWidth - ev.clientX, false);
+  const up = (ev) => {
+    resizer.releasePointerCapture(ev.pointerId);
+    resizer.removeEventListener("pointermove", move);
+    document.body.classList.remove("resizing");
+    setChatWidth(window.innerWidth - ev.clientX);
+  };
+  resizer.addEventListener("pointermove", move);
+  resizer.addEventListener("pointerup", up, { once: true });
+});
+resizer.addEventListener("dblclick", () => setChatWidth(CHAT_W.def));
+resizer.addEventListener("keydown", (e) => {
+  const cur = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--chat-w")) || CHAT_W.def;
+  const step = e.shiftKey ? 80 : 20;
+  if (e.key === "ArrowLeft") { e.preventDefault(); setChatWidth(cur + step); }
+  else if (e.key === "ArrowRight") { e.preventDefault(); setChatWidth(cur - step); }
+  else if (e.key === "Home") { e.preventDefault(); setChatWidth(CHAT_W.def); }
+});
+// A smaller window must not leave the panel wider than the page allows.
+window.addEventListener("resize", () => setChatWidth(parseInt(getComputedStyle(document.documentElement).getPropertyValue("--chat-w")) || CHAT_W.def, false));

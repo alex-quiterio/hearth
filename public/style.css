@@ -68,7 +68,7 @@ button:focus-visible, .plant:focus-visible, a:focus-visible { outline: 2px solid
 .btnlike { display: inline-block; border: 1px solid var(--line); border-radius: 999px; text-decoration: none; color: var(--ink); }
 
 /* layout */
-.layout { display: grid; grid-template-columns: minmax(0, 1fr) 420px; min-height: 100vh; transition: grid-template-columns .25s ease; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) var(--chat-w, 420px); min-height: 100vh; transition: grid-template-columns .25s ease; }
 body.chat-collapsed .layout { grid-template-columns: minmax(0, 1fr) 44px; }
 main { padding: 28px clamp(16px, 4vw, 48px) 80px; max-width: 1100px; width: 100%; margin: 0 auto; }
 
@@ -340,3 +340,13 @@ body.claude-working #send { display: none; }
 .hist-del { border: 0; padding: 0 12px; color: var(--muted); border-radius: 12px; }
 .hist-del:hover { color: var(--clay-ink); }
 .history[hidden], .chat-log[hidden] { display: none; }
+
+/* Resize the conversation panel: drag its left edge */
+.chat-resize { position: absolute; top: 0; bottom: 0; left: -5px; width: 10px; cursor: col-resize; z-index: 5; touch-action: none; }
+.chat-resize::after { content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 2px; background: transparent; transition: background .15s; }
+.chat-resize:hover::after, .chat-resize:focus-visible::after, body.resizing .chat-resize::after { background: var(--clay); }
+.chat-resize:focus-visible { outline: none; }
+body.resizing, body.resizing * { cursor: col-resize !important; user-select: none; }
+body.resizing .layout { transition: none; }
+body.chat-collapsed .chat-resize { display: none; }
+@media (max-width: 900px) { .chat-resize { display: none; } }
