@@ -486,6 +486,7 @@ function append(cls, html) {
   el.className = cls;
   el.innerHTML = html;
   $("#log").appendChild(el);
+  if (work) $("#log").appendChild(work);
   scrollLog();
   return el;
 }
@@ -502,11 +503,55 @@ function light(text) {
 }
 const inline = (s) => s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>").replace(/`([^`]+)`/g, "<code>$1</code>");
 
+/* The working row: always the last thing in the log while a turn runs, so it is never
+   ambiguous whether Claude is still going. Ember, what it is doing, and for how long. */
+let work = null, workText = "Thinking", workStart = 0, workTimer = null;
+const BASE_TITLE = document.title;
+
+function renderWork() {
+  if (!work) return;
+  const secs = Math.floor((Date.now() - workStart) / 1000);
+  const t = secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m ${String(secs % 60).padStart(2, "0")}s`;
+  const asking = waitingPermissions > 0;
+  work.classList.toggle("asking", asking);
+  $(".work-text", work).textContent = asking ? "Waiting for your approval" : `${workText}…`;
+  $(".work-time", work).textContent = t;
+  const status = asking ? "waiting for you" : `${workText.toLowerCase()} · ${t}`;
+  $("#chatStatus").textContent = status;
+  document.title = `${asking ? "◆ Approve" : "● " + workText} · ${BASE_TITLE}`;
+  const fab = $("#openChat");
+  if (fab) fab.textContent = asking ? "Approve in Conversation" : `Claude is ${workText.toLowerCase()}…`;
+}
+function showWork() {
+  if (!work) {
+    work = document.createElement("div");
+    work.className = "working";
+    work.setAttribute("role", "status");
+    work.setAttribute("aria-live", "polite");
+    work.innerHTML = `<span class="ember" aria-hidden="true"><i></i><i></i><i></i></span><span class="work-text"></span><span class="work-time muted"></span>`;
+  }
+  $("#log").appendChild(work); // move to the bottom
+  renderWork();
+  scrollLog();
+}
+function setActivity(text) { workText = text; renderWork(); }
+
 function setRunning(on, status = "") {
   running = on;
   $("#stop").hidden = !on;
   $("#send").disabled = on;
-  $("#chatStatus").textContent = status || (on ? "thinking…" : sessionId ? "listening" : "");
+  document.body.classList.toggle("claude-working", on);
+  clearInterval(workTimer);
+  if (on) {
+    workStart = Date.now(); workText = "Thinking";
+    showWork();
+    workTimer = setInterval(renderWork, 1000);
+  } else {
+    work?.remove(); work = null;
+    document.title = BASE_TITLE;
+    const fab = $("#openChat"); if (fab) fab.textContent = "Conversation";
+    $("#chatStatus").textContent = status || (sessionId ? "listening" : "");
+  }
   updateRailDot();
 }
 
@@ -555,11 +600,13 @@ async function send(message) {
 function handle(ev) {
   switch (ev.type) {
     case "session": sessionId = ev.sessionId; break;
-    case "status": $("#chatStatus").textContent = ev.text; break;
+    case "status": if (ev.text === "stopped") setActivity("Stopping"); break;
+    case "activity": setActivity(ev.text); break;
     case "text":
       if (!bubble) bubble = append("msg assistant", "");
       bubbleText += ev.delta;
       bubble.innerHTML = light(bubbleText);
+      if (work) $("#log").appendChild(work);
       scrollLog();
       break;
     case "tool":
@@ -576,11 +623,12 @@ function handle(ev) {
         $(".chat-buttons", el).outerHTML = `<div class="done">${allow ? "Allowed" : "Denied"}</div>`;
         waitingPermissions = Math.max(0, waitingPermissions - 1);
         updateRailDot();
+        renderWork();
         await fetch("/api/permission", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: ev.id, allow }) });
       };
       $("[data-allow]", el).onclick = () => decide(true);
       $("[data-deny]", el).onclick = () => decide(false);
-      $("#chatStatus").textContent = "waiting for you";
+      renderWork();
       break;
     }
     case "done":

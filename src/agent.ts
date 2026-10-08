@@ -9,6 +9,7 @@ export type ChatEvent =
   | { type: "tool"; name: string; summary: string }
   | { type: "permission"; id: string; tool: string; summary: string }
   | { type: "status"; text: string }
+  | { type: "activity"; text: string }
   | { type: "done"; costUsd: number; isError: boolean; result?: string }
   | { type: "error"; message: string };
 
@@ -40,6 +41,23 @@ export function autoAllowed(tool: string, input: Record<string, unknown>): boole
   }
   if (tool.startsWith("mcp__beeper__")) return !BEEPER_WRITE.test(tool.slice("mcp__beeper__".length));
   return false;
+}
+
+/** What Claude is doing right now, in plain words for the working row. */
+function activity(tool: string, input: Record<string, unknown>): string {
+  if (tool === "Skill") return `Opening ${input.skill ?? input.name ?? "a skill"}`;
+  if (tool === "Bash") {
+    const cmd = String(input.command ?? "");
+    if (/obsidian\b.*\b(create|append|prepend|write|overwrite)\b|python3?.*obsidian/.test(cmd)) return "Writing to the vault";
+    if (/obsidian\b/.test(cmd)) return "Reading the vault";
+    return "Running a command";
+  }
+  if (tool.startsWith("mcp__beeper__")) return /send/i.test(tool) ? "Sending on Beeper" : "Reading Beeper";
+  if (tool === "Read" || tool === "Grep" || tool === "Glob") return "Reading";
+  if (tool === "Write" || tool === "Edit") return "Writing a file";
+  if (tool === "WebSearch" || tool === "WebFetch") return "Looking on the web";
+  if (tool === "Agent" || tool === "Task") return "Asking a helper";
+  return `Using ${tool}`;
 }
 
 function summarize(tool: string, input: Record<string, unknown>): string {
@@ -97,10 +115,19 @@ export async function* chat(message: string, sessionId?: string): AsyncGenerator
           const ev = m.event as any;
           if (m.parent_tool_use_id) continue;
           if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta") push({ type: "text", delta: ev.delta.text });
-          else if (ev.type === "message_start") push({ type: "text", delta: "" });
+          else if (ev.type === "message_start") push({ type: "activity", text: "Thinking" });
+          else if (ev.type === "content_block_start") {
+            const b = ev.content_block;
+            if (b?.type === "thinking") push({ type: "activity", text: "Thinking" });
+            else if (b?.type === "text") push({ type: "activity", text: "Writing" });
+            else if (b?.type === "tool_use") push({ type: "activity", text: "Choosing a step" });
+          }
         } else if (m.type === "assistant") {
           for (const b of m.message.content as any[])
-            if (b.type === "tool_use") push({ type: "tool", name: b.name, summary: summarize(b.name, b.input ?? {}) });
+            if (b.type === "tool_use") {
+              push({ type: "tool", name: b.name, summary: summarize(b.name, b.input ?? {}) });
+              push({ type: "activity", text: activity(b.name, b.input ?? {}) });
+            }
         } else if (m.type === "result") {
           push({
             type: "done",
