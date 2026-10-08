@@ -18,8 +18,11 @@ const watered = new Set(); // optimistic waterings until the vault catches up
 /* ---------- data ---------- */
 
 let retry = null;
+let stopped = false; // stopped on purpose from the page: no relighting
+let events = null;
 async function load() {
   clearTimeout(retry);
+  if (stopped) return;
   try {
     const res = await fetch("/api/state");
     if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
@@ -432,7 +435,7 @@ document.addEventListener("click", (e) => {
 $("#sheet").addEventListener("click", (e) => { if (e.target === $("#sheet")) $("#sheet").close(); });
 
 function listen() {
-  const es = new EventSource("/api/events");
+  const es = (events = new EventSource("/api/events"));
   let timer;
   let opened = false;
   // After a server restart the stream reconnects: reload in case we missed changes.
@@ -661,3 +664,15 @@ $("#closeChat").onclick = () => $("#chat").classList.remove("open");
 
 load();
 listen();
+
+/* Stop the server from the page. The launcher (Hearth.app) starts it again. */
+$("#shutdown").onclick = async () => {
+  if (!confirm("Stop the Hearth server? Open Hearth.app to start it again.")) return;
+  try { await fetch("/api/shutdown", { method: "POST" }); } catch {}
+  stopped = true;
+  clearTimeout(retry);
+  events?.close();
+  document.body.innerHTML = `<main class="stopped"><h1>Hearth is resting</h1>
+    <p class="muted">The server is stopped. Open <strong>Hearth.app</strong> on your Desktop to light it again.</p></main>`;
+  document.title = "Hearth (stopped)";
+};

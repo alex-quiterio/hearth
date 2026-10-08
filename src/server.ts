@@ -98,6 +98,14 @@ Bun.serve({
       },
     },
 
+    "/api/shutdown": {
+      POST: () => {
+        console.log("stopped from the page");
+        setTimeout(() => process.exit(0), 200);
+        return Response.json({ ok: true });
+      },
+    },
+
     "/api/stop": {
       POST: () => {
         stop();
