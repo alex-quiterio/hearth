@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hearth</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="layout">
+    <main id="main">
+      <header class="top">
+        <div class="brand">
+          <h1>Hearth</h1>
+          <p class="meta" id="meta"></p>
+        </div>
+        <div class="actions" id="actions"></div>
+      </header>
+      <div id="notices"></div>
+      <div id="panels"><p class="muted">Lighting the fire…</p></div>
+      <footer id="changes"></footer>
+    </main>
+
+    <aside class="chat" id="chat" aria-label="Conversation">
+      <div class="chat-head">
+        <strong>Conversation</strong>
+        <span class="chat-status muted" id="chatStatus"></span>
+        <div class="chat-tools">
+          <button class="ghost" id="newChat" title="Start a new conversation">New</button>
+          <button class="ghost only-mobile" id="closeChat" aria-label="Close">✕</button>
+        </div>
+      </div>
+      <div class="chat-log" id="log">
+        <p class="muted hint">Pick an action above, or a person's tend / repair / reply, or just write.</p>
+      </div>
+      <form class="chat-input" id="form">
+        <textarea id="input" rows="2" placeholder="Write to Claude… (Enter to send, Shift+Enter for a new line)"></textarea>
+        <div class="chat-buttons">
+          <button type="button" class="ghost" id="stop" hidden>Stop</button>
+          <button type="submit" id="send">Send</button>
+        </div>
+      </form>
+    </aside>
+  </div>
+  <button class="chat-fab only-mobile" id="openChat">💬 Conversation</button>
+  <script src="/app.js"></script>
+</body>
+</html>
