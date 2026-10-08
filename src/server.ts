@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { watch } from "node:fs";
-import { findVault, state, lastChange, PATHS } from "./vault";
+import { findVault, state, lastChange, kinState, kinPeople, PATHS } from "./vault";
+import { waterPlant } from "./garden";
 import { chat, answerPermission, stop } from "./agent";
 
 const vault = await findVault();
@@ -40,6 +41,8 @@ Bun.serve({
     "/": () => new Response(Bun.file(join(PUBLIC, "index.html"))),
     "/app.js": () => new Response(Bun.file(join(PUBLIC, "app.js"))),
     "/style.css": () => new Response(Bun.file(join(PUBLIC, "style.css"))),
+    "/favicon.svg": () => new Response(Bun.file(join(PUBLIC, "favicon.svg"))),
+    "/favicon.ico": () => new Response(Bun.file(join(PUBLIC, "favicon.svg")), { headers: { "content-type": "image/svg+xml" } }),
 
     "/api/state": async () => Response.json(await state(vault)),
 
@@ -75,6 +78,16 @@ Bun.serve({
           },
         });
         return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } });
+      },
+    },
+
+    "/api/water": {
+      POST: async (req) => {
+        const { name, note } = (await req.json()) as { name?: string; note?: string };
+        const person = kinPeople(await kinState(vault)).find((p) => p.name === name?.normalize("NFC"));
+        if (!person) return Response.json({ ok: false, error: `${name} is not on the kin map` }, { status: 404 });
+        await waterPlant(vault, person, note ?? "");
+        return Response.json({ ok: true });
       },
     },
 

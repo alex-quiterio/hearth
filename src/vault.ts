@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { join, basename } from "node:path";
 import { readdir, stat } from "node:fs/promises";
+import { garden, threadSections } from "./garden";
 
 // The vault is the single source of truth. Hearth only reads it; skills write it.
 
@@ -105,9 +106,7 @@ function parsePerson(line: string, ring: string): Person {
   };
 }
 
-const UNSENT = /por enviar|not sent|não enviad|parcialmente|rascunho/i;
-
-/** Per person: date of the latest thread and how many thread drafts are not fully sent. */
+/** Per person: date of the latest thread and how many threads end in an unsent draft. */
 async function conversationSignals(vault: string) {
   const dir = join(vault, PATHS.conversations);
   const out = new Map<string, { lastThread: string | null; draftsWaiting: number }>();
@@ -118,12 +117,10 @@ async function conversationSignals(vault: string) {
     return out;
   }
   for (const f of files) {
-    const text = await Bun.file(join(dir, f)).text();
-    const dates = [...text.matchAll(/^## (\d{4}-\d{2}-\d{2})/gm)].map((m) => m[1]!).sort();
-    const states = [...text.matchAll(/^(?:Estado|Status|State): \*\*([^*]+)\*\*/gm)].map((m) => m[1]!);
+    const ts = threadSections(await Bun.file(join(dir, f)).text());
     out.set(f.replace(/\.md$/, "").normalize("NFC"), {
-      lastThread: dates.at(-1) ?? null,
-      draftsWaiting: states.filter((s) => UNSENT.test(s)).length,
+      lastThread: ts.map((t) => t.date).sort().at(-1) ?? null,
+      draftsWaiting: ts.filter((t) => t.state === "draft").length,
     });
   }
   return out;
@@ -225,18 +222,23 @@ export async function hearthConfig(vault: string) {
     panels: (fm.panels ?? ["focus", "weak-points", "rings", "tending", "inner"]) as string[],
     innerVeiled: fm.inner?.veiled ?? true,
     changes: note ? md(sections(note.body).find((s) => /^changes/i.test(s.heading))?.text ?? "") : "",
+    changesRaw: note ? (sections(note.body).find((s) => /^changes/i.test(s.heading))?.text ?? "") : "",
   };
 }
 
-export async function state(vault: string) {
+export async function state(vault: string, today?: string) {
   const [config, kin, inner, tending] = await Promise.all([
     hearthConfig(vault),
     kinState(vault),
     innerState(vault),
     tendingState(vault),
   ]);
-  return { vaultName: VAULT_NAME, config, kin, inner, tending, at: Date.now() };
+  const gardenState = await garden(vault, kinPeople(kin), config, today);
+  return { vaultName: VAULT_NAME, config, kin, inner, tending, garden: gardenState, at: Date.now() };
 }
+
+export const kinPeople = (kin: Awaited<ReturnType<typeof kinState>>): Person[] =>
+  kin.exists ? kin.rings.flatMap((r) => r.people) : [];
 
 /** Markdown to HTML, with [[wiki links]] opening the note in Obsidian. */
 export function md(src: string): string {

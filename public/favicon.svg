@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="62%" r="55%">
+      <stop offset="0" stop-color="#f6c66b"/>
+      <stop offset="1" stop-color="#2f3a2c"/>
+    </radialGradient>
+    <linearGradient id="flame" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#c4572e"/>
+      <stop offset=".6" stop-color="#e98a3a"/>
+      <stop offset="1" stop-color="#f6c66b"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#glow)"/>
+  <!-- the fire -->
+  <path d="M32 54c-9 0-14-6-14-13 0-7 5-11 8-16 1 4 3 6 5 7 0-6 3-12 8-16-1 6 1 10 4 14 2 3 3 6 3 10 0 8-5 14-14 14z" fill="url(#flame)"/>
+  <!-- the sprout growing out of it -->
+  <path d="M32 50V36" stroke="#3f6b3a" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <path d="M32 40c-6 0-9-4-9-8 5 0 9 3 9 8z" fill="#7fae5c"/>
+  <path d="M32 37c0-6 4-9 9-9 0 5-4 9-9 9z" fill="#a6cf7a"/>
+  <!-- the logs -->
+  <rect x="16" y="52" width="32" height="5" rx="2.5" fill="#6b4226"/>
+</svg>

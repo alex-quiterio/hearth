@@ -43,7 +43,7 @@ describe("conversation signals", () => {
   });
 
   test("accented names match files stored in decomposed Unicode", () => {
-    expect(person("Inês Feijão")).toMatchObject({ lastThread: "2026-09-25", draftsWaiting: 2 });
+    expect(person("Inês Feijão")).toMatchObject({ lastThread: "2026-09-25", draftsWaiting: 1 });
   });
 
   test("no conversation file means no signals", () => {
@@ -75,7 +75,7 @@ describe("inner work and tending", () => {
   });
 
   test("tending shows the latest blocks", () => {
-    expect(s.tending?.latest[0]!.heading).toBe("Week of 2026-09-28");
+    expect(s.tending?.latest.map((b) => b.heading)).toEqual(["2026-W40 · 2026-09-28", "2026-W41 · 2026-10-06"]);
   });
 });
 
