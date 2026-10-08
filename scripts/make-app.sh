@@ -8,12 +8,16 @@ tmp="$(mktemp -d)"
 
 osacompile -o "$app" "$here/scripts/Hearth.applescript"
 
-# Icon: render the favicon at 1024px, then every size macOS wants.
-qlmanage -t -s 1024 -o "$tmp" "$here/public/favicon.svg" >/dev/null 2>&1
+# Icon: assets/hearth-icon.png if present, else the favicon rendered at 1024px.
+src="$here/assets/hearth-icon.png"
+if [ ! -f "$src" ]; then
+  qlmanage -t -s 1024 -o "$tmp" "$here/public/favicon.svg" >/dev/null 2>&1
+  src="$tmp/favicon.svg.png"
+fi
 mkdir "$tmp/icon.iconset"
 for s in 16 32 128 256 512; do
-  sips -z $s $s "$tmp/favicon.svg.png" --out "$tmp/icon.iconset/icon_${s}x${s}.png" >/dev/null
-  sips -z $((s*2)) $((s*2)) "$tmp/favicon.svg.png" --out "$tmp/icon.iconset/icon_${s}x${s}@2x.png" >/dev/null
+  sips -s format png -z $s $s "$src" --out "$tmp/icon.iconset/icon_${s}x${s}.png" >/dev/null
+  sips -s format png -z $((s*2)) $((s*2)) "$src" --out "$tmp/icon.iconset/icon_${s}x${s}@2x.png" >/dev/null
 done
 iconutil -c icns "$tmp/icon.iconset" -o "$app/Contents/Resources/applet.icns"
 rm -rf "$tmp"
