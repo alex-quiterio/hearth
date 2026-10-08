@@ -1,193 +1,474 @@
-// Hearth frontend: renders /api/state, streams /api/chat. No build step.
+// Hearth frontend: a garden around a hearth fire. Renders /api/state, streams /api/chat. No build step.
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const day = (d) => (d ? String(d).slice(0, 10) : "");
-const PLACE_ICON = { here: "🏙️", land: "🌳", lisbon: "🌊", far: "✈️" };
+const PLACE = { here: "here", land: "near the land", lisbon: "Lisbon", far: "far" };
+const RING_ORDER = ["core", "close", "warm", "new", "drifting"];
+const RING_NAME = { core: "Core", close: "Close", warm: "Warm", new: "New", drifting: "Drifting" };
+const FROM = { thread: "a thread you wrote", tending: "the tending log", water: "marked tended here", map: "the kin map" };
 
 let S = null;
+let G = null; // garden, from the server or derived
 let placeFilter = "all";
 let unveiled = false;
-const openNotes = new Set();
+const watered = new Set(); // optimistic waterings until the vault catches up
 
-/* ---------- dashboard ---------- */
+/* ---------- data ---------- */
 
+let retry = null;
 async function load() {
+  clearTimeout(retry);
   try {
     const res = await fetch("/api/state");
+    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
     S = await res.json();
+    G = S.garden ?? deriveGarden(S);
+    for (const n of watered) applyWater(n);
     render();
   } catch (e) {
-    $("#panels").innerHTML = `<div class="notice">Could not read the vault: ${esc(e.message)}</div>`;
+    // Never stay stuck: say so and keep trying (the server may be restarting).
+    console.warn("state failed", e);
+    if (!S) $("#garden").innerHTML = `<p class="muted relight">The fire went out, relighting…</p>`;
+    else toast("The fire went out, relighting…");
+    retry = setTimeout(load, 2000);
   }
 }
 
-function allPeople() {
-  return (S.kin.exists ? S.kin.rings : []).flatMap((r) => r.people.map((p) => ({ ...p, ringTitle: r.title })));
+// Older servers have no garden: build plants from the kin rings, thirst unknown.
+function deriveGarden(s) {
+  const today = new Date().toISOString().slice(0, 10);
+  const plants = (s.kin.exists ? s.kin.rings : []).flatMap((r) =>
+    r.people.map((p) => ({ ...p, ring: r.key, lastTended: p.lastThread ?? null, lastTendedFrom: p.lastThread ? "thread" : null,
+      daysSince: p.lastThread ? Math.round((Date.parse(today) - Date.parse(p.lastThread)) / 864e5) : null,
+      interval: 14, thirst: "unknown", thisWeek: false, pinned: null, watch: null })),
+  );
+  return { today, week: null, thisWeek: [], plants, rhythm: [] };
 }
 
-function findPerson(name) {
-  const n = String(name).toLowerCase();
-  return allPeople().find((p) => p.name.toLowerCase() === n) ?? allPeople().find((p) => p.name.toLowerCase().includes(n));
+const plantOf = (name) => G.plants.find((p) => p.name === name) ?? G.plants.find((p) => p.name.toLowerCase().includes(String(name).toLowerCase()));
+const firstName = (n) => String(n).replace(/^the\s+/i, "").split(/\s+/)[0];
+const obsidianLink = (name) => `obsidian://open?vault=${encodeURIComponent(S.vaultName)}&file=${encodeURIComponent(name)}`;
+const daysUntil = (d) => (d ? Math.round((Date.parse(day(d)) - Date.parse(G.today)) / 864e5) : null);
+function sinceText(p) {
+  const d = p.daysSince;
+  if (d == null) return "no record of contact yet";
+  if (d === 0) return "in touch today";
+  if (d === 1) return "in touch yesterday";
+  if (d < 7) return `in touch ${d} days ago`;
+  return `${d} days since you were in touch`;
 }
 
-function obsidianLink(name) {
-  return `obsidian://open?vault=${encodeURIComponent(S.vaultName)}&file=${encodeURIComponent(name)}`;
+function applyWater(name) {
+  const p = plantOf(name);
+  if (p) Object.assign(p, { thirst: "fresh", daysSince: 0, lastTended: G.today, lastTendedFrom: "water" });
+  const w = G.thisWeek.find((t) => t.name === name);
+  if (w && !w.done) Object.assign(w, { done: true, outcome: w.outcome || "tended today" });
 }
+
+async function water(name, el) {
+  watered.add(name);
+  applyWater(name);
+  el?.classList.add("rippling");
+  setTimeout(render, el ? 650 : 0);
+  try {
+    const r = await (await fetch("/api/water", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }) })).json();
+    if (!r.ok) throw new Error(r.error || "the vault did not take it");
+  } catch (e) {
+    watered.delete(name);
+    toast(`Could not mark ${name} as tended: ${e.message}`);
+    load();
+  }
+}
+
+function toast(msg) {
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+/* ---------- render ---------- */
 
 function render() {
   const y = window.scrollY;
   const { config, kin } = S;
+  const d = new Date(G.today + "T12:00");
+  $("#today").textContent = d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
 
-  $("#meta").textContent = [
-    `vault ${S.vaultName}`,
-    kin.exists && kin.updated ? `kin map updated ${day(kin.updated)}` : null,
-  ].filter(Boolean).join(" · ");
+  const active = G.rhythm.filter((r) => r.active).length;
+  $("#rhythm").innerHTML = G.rhythm.length
+    ? `<span class="dots">${G.rhythm.map((r) => `<i class="${r.active ? "on" : ""}" title="${esc(r.date)}${r.active ? " · in touch" : ""}"></i>`).join("")}</span>
+       <span class="muted">${active ? `in touch on ${active} of the last 7 days` : "a quiet week so far"}</span>`
+    : "";
 
   $("#actions").innerHTML = config.actions
-    .map((a, i) => `<button data-action="${i}" title="${esc(a.hint ?? a.prompt)}">${esc(a.label)}</button>`)
+    .map((a, i) => `<button class="tool ${/hearth/i.test(a.label) ? "gardener" : ""}" data-action="${i}" title="${esc(a.hint ?? a.prompt)}">${esc(a.label)}</button>`)
     .join("");
 
   const notices = [];
-  if (!config.exists) notices.push(`No <code>4 - Archive/kin/Hearth.md</code> in the vault yet, so the hearth runs on defaults. Ask Claude to tend the hearth and it will write one.`);
+  if (!config.exists) notices.push(`No <code>4 - Archive/kin/Hearth.md</code> yet, so the hearth runs on defaults.`);
   if (config.error) notices.push(`Hearth.md: ${esc(config.error)}`);
   if (!kin.exists) notices.push(`No Kin map yet. Run <code>/kin:map</code> to draw the first one.`);
   $("#notices").innerHTML = notices.map((n) => `<div class="notice">${n}</div>`).join("");
 
-  const renderers = { focus: focusPanel, "weak-points": weakPanel, rings: ringsPanel, tending: tendingPanel, inner: innerPanel };
-  const html = config.panels.filter((p) => renderers[p]).map((p) => renderers[p]()).join("");
-  $("#panels").innerHTML = html || `<p class="muted">No panels configured.</p>`;
+  $("#garden").innerHTML = gardenSvg();
+  $("#legend").innerHTML = legend();
 
-  $("#changes").innerHTML = config.changes
-    ? `<details class="changes"><summary>How the hearth has changed</summary><div class="html">${config.changes}</div></details>`
-    : "";
+  const byPanel = { focus: frostSection, "weak-points": weatherSection, rings: bedsSection, inner: soilSection };
+  const rest = config.panels.filter((p) => byPanel[p]).map((p) => byPanel[p]());
+  $("#sections").innerHTML = [wateringSection(), askingSection(), ...rest, journalSection()].join("");
   window.scrollTo(0, y);
 }
 
-function personSub(p) {
-  if (!p) return "";
-  const bits = [p.ringTitle?.replace(/\(.*\)/, "").trim(), p.placeLabel, p.lastThread ? `last thread ${p.lastThread}` : null];
-  const drafts = p.draftsWaiting ? ` <span class="badge">${p.draftsWaiting} draft${p.draftsWaiting > 1 ? "s" : ""} waiting</span>` : "";
-  return `<div class="sub">${esc(bits.filter(Boolean).join(" · "))}${drafts}</div>`;
+/* ---------- the garden svg ---------- */
+
+const BEDS = { core: [70, 140], close: [140, 220], warm: [220, 290], new: [290, 350], drifting: [350, 398] };
+const SIZE = { core: 1.35, close: 1.05, warm: 0.9, new: 0.75, drifting: 0.8 };
+
+function hash(s) {
+  let h = 2166136261;
+  for (const c of s) h = Math.imul(h ^ c.codePointAt(0), 16777619);
+  return (h >>> 0) / 4294967295;
 }
 
-function focusPanel() {
+function gardenSvg() {
+  const C = 400;
+  let beds = "";
+  RING_ORDER.forEach((k, i) => {
+    const [a, b] = BEDS[k];
+    beds += `<circle class="bed bed-${k}" cx="${C}" cy="${C}" r="${(a + b) / 2}" stroke-width="${b - a - 4}"/>`;
+    beds += `<text class="bed-label" x="${C}" y="${C - (a + b) / 2 + 4}" text-anchor="middle">${RING_NAME[k]}</text>`;
+  });
+  // fallen leaves drift in the outer bed
+  let fallen = "";
+  for (let i = 0; i < 18; i++) {
+    const t = (i / 18) * Math.PI * 2 + 0.3, r = 360 + hash("leaf" + i) * 30;
+    fallen += `<path class="fallen" d="M0 0 C 4 -3, 8 -3, 11 0 C 8 3, 4 3, 0 0Z" transform="translate(${C + r * Math.cos(t)} ${C + r * Math.sin(t)}) rotate(${hash("r" + i) * 360})"/>`;
+  }
+  let plants = "";
+  for (const k of RING_ORDER) {
+    const list = G.plants.filter((p) => p.ring === k);
+    const [a, b] = BEDS[k];
+    const gap = 0.42; // keep the top of each bed free for its label
+    const span = Math.PI * 2 - gap;
+    list.forEach((p, i) => {
+      const step = span / Math.max(list.length, 1);
+      const t = -Math.PI / 2 + gap / 2 + step * (i + 0.5) + (hash(p.name) - 0.5) * step * 0.35;
+      const r = (a + b) / 2 + 8 + (hash(p.name + "r") - 0.5) * (b - a) * 0.25;
+      plants += plantSvg(p, C + r * Math.cos(t), C + r * Math.sin(t));
+    });
+  }
+  return `<svg viewBox="0 0 800 800" role="group" aria-label="Kin map: the rings around the hearth">
+    <defs><radialGradient id="glow"><stop offset="0" stop-color="var(--amber)" stop-opacity=".45"/><stop offset="1" stop-color="var(--amber)" stop-opacity="0"/></radialGradient></defs>
+    ${beds}${fallen}
+    <circle cx="400" cy="400" r="78" fill="url(#glow)" class="glow"/>
+    ${fire()}
+    ${plants}
+  </svg>`;
+}
+
+function fire() {
+  return `<g class="fire" transform="translate(400 414)" aria-hidden="true">
+    <rect x="-26" y="2" width="52" height="9" rx="4.5" class="log" transform="rotate(12)"/>
+    <rect x="-26" y="2" width="52" height="9" rx="4.5" class="log" transform="rotate(-12)"/>
+    <path class="flame f1" d="M0 4 C -18 -4, -16 -26, -2 -44 C -2 -30, 10 -28, 8 -14 C 14 -20, 16 -10, 16 -4 C 14 2, 8 4, 0 4Z"/>
+    <path class="flame f2" d="M0 4 C -10 0, -10 -16, 0 -28 C 2 -18, 9 -14, 8 -4 C 6 2, 3 4, 0 4Z"/>
+    <path class="flame f3" d="M0 4 C -5 2, -5 -6, 0 -14 C 2 -8, 5 -5, 4 0 C 3 3, 1 4, 0 4Z"/>
+  </g>`;
+}
+
+const LEAF = "M0 0 C 5 -4, 11 -4, 15 0 C 11 4, 5 4, 0 0Z";
+
+function plantSvg(p, x, y) {
+  const s = SIZE[p.ring] ?? 1;
+  const th = p.thirst || "unknown";
+  const droop = th === "wilting" ? 1 : th === "thirsty" ? 0.45 : 0;
+  let body = "";
+  if (th === "unknown") {
+    body = `<ellipse class="seed" cx="0" cy="-3" rx="5" ry="3.6"/><path class="stem" d="M0 -5 C 0 -9, 1 -11, 0 -13"/><path class="leaf" d="${LEAF}" transform="translate(0 -12) rotate(-60) scale(.5)"/>`;
+  } else if (p.ring === "new") {
+    body = `<path class="stem" d="M0 0 C 0 -6, 0 -10, 0 -15"/>
+      <path class="leaf" d="${LEAF}" transform="translate(0 -14) rotate(${-150 + droop * 60}) scale(.8)"/>
+      <path class="leaf" d="${LEAF}" transform="translate(0 -14) rotate(${-30 - droop * 60}) scale(.8)"/>`;
+  } else if (p.ring === "core") {
+    // a small tree: trunk and a round crown that thins with thirst
+    const n = th === "wilting" ? 2 : th === "thirsty" ? 3 : 4;
+    const blobs = [[0, -34, 13], [-11, -27, 10], [11, -27, 10], [0, -22, 9]].slice(0, n);
+    body = `<path class="trunk" d="M-2 0 L-1.5 -22 L1.5 -22 L2 0Z"/>${blobs.map(([cx, cy, r]) => `<circle class="leaf" cx="${cx}" cy="${cy + droop * 4}" r="${r}"/>`).join("")}`;
+  } else {
+    const bend = droop * 10;
+    const top = `${bend} -28`;
+    body = `<path class="stem" d="M0 0 C 0 -10, ${bend * 0.3} -20, ${top}"/>`;
+    const leaves = th === "wilting" ? [[-9, 1], [-17, -1]] : [[-9, 1], [-15, -1], [-21, 1], [-25, -1]].slice(0, th === "thirsty" ? 3 : 4);
+    for (const [ly, side] of leaves) {
+      const ang = side > 0 ? -25 + droop * 70 : -155 - droop * 70;
+      body += `<path class="leaf" d="${LEAF}" transform="translate(${(bend * -ly) / 28} ${ly}) rotate(${ang})"/>`;
+    }
+    if (p.ring === "warm" && th !== "wilting") body += `<circle class="bloom" cx="${bend}" cy="-30" r="4.5"/><circle class="bloom-heart" cx="${bend}" cy="-30" r="1.8"/>`;
+    if (th === "wilting") body += `<path class="leaf fallen-own" d="${LEAF}" transform="translate(6 2) rotate(10) scale(.8)"/>`;
+  }
+
+  const until = p.watch ? daysUntil(p.watch.until) : null;
+  const marks = [
+    p.place ? `<rect class="place place-${p.place}" x="-10" y="3" width="20" height="3" rx="1.5"/>` : "",
+    p.pinned != null ? `<ellipse class="stone" cx="-13" cy="1" rx="5" ry="3.5"/>` : "",
+    p.watch ? `<g class="flag ${until != null && until <= 7 ? "near" : ""}" transform="translate(12 0)"><path d="M0 0 V-16"/><path class="ribbon" d="M0 -16 L8 -13 L0 -10Z"/></g>` : "",
+    p.thisWeek ? drop(p) : "",
+  ].join("");
+
+  const label = `${p.name}, ${RING_NAME[p.ring]}, ${sinceText(p)}${p.thisWeek ? ", in this week's tending" : ""}`;
+  return `<g class="plant t-${th} ring-${p.ring}" transform="translate(${x.toFixed(1)} ${y.toFixed(1)})" tabindex="0" role="button" data-plant="${esc(p.name)}" aria-label="${esc(label)}">
+    <circle class="hit" r="${24 * s}" cy="${-12 * s}"/>
+    <ellipse class="soil" cx="0" cy="2" rx="${11 * s}" ry="${3 * s}"/>
+    <g class="sway" style="animation-delay:${(-hash(p.name) * 6).toFixed(2)}s"><g transform="scale(${s})">${body}</g></g>
+    ${marks}
+    <circle class="ripple" r="6" cy="-6"/>
+    <text class="plabel" y="${18}" text-anchor="middle">${esc(firstName(p.name))}</text>
+  </g>`;
+}
+
+function drop(p) {
+  const done = G.thisWeek.find((t) => t.name === p.name)?.done;
+  return `<path class="drop ${done ? "done" : ""}" d="M0 -6 C 3 -2, 4 1, 0 4 C -4 1, -3 -2, 0 -6Z" transform="translate(-14 -24) scale(1.2)"/>`;
+}
+
+function legend() {
+  const sw = (cls, label) => `<span class="lg"><svg viewBox="-12 -24 24 30" width="18" height="22" aria-hidden="true"><g class="plant t-${cls} ring-close"><g transform="scale(.75)">${
+    cls === "unknown" ? `<ellipse class="seed" cx="0" cy="-3" rx="5" ry="3.6"/>` :
+    `<path class="stem" d="M0 0 C 0 -10, 0 -20, ${cls === "wilting" ? 10 : cls === "thirsty" ? 4 : 0} -28"/><path class="leaf" d="${LEAF}" transform="translate(0 -15) rotate(${cls === "wilting" ? 40 : cls === "thirsty" ? 10 : -25})"/><path class="leaf" d="${LEAF}" transform="translate(0 -9) rotate(${cls === "wilting" ? 140 : cls === "thirsty" ? 170 : -155})"/>`
+  }</g></g></svg>${label}</span>`;
+  const places = Object.entries(PLACE).map(([k, v]) => `<span class="lg"><i class="pm place-${k}"></i>${v}</span>`).join("");
+  return `<div class="lg-row"><span class="lg-title">Since contact</span>${sw("fresh", "in touch recently")}${sw("ok", "due")}${sw("thirsty", "overdue")}${sw("wilting", "long overdue")}${sw("unknown", "no record")}</div>
+    <div class="lg-row"><span class="lg-title">Marks</span>
+      <span class="lg"><svg viewBox="-6 -7 12 12" width="12" height="12" aria-hidden="true"><path class="drop" d="M0 -6 C 3 -2, 4 1, 0 4 C -4 1, -3 -2, 0 -6Z"/></svg>this week's tending</span>
+      <span class="lg"><svg viewBox="-6 -5 12 10" width="12" height="10" aria-hidden="true"><ellipse class="stone" rx="5" ry="3.5"/></svg>pinned</span>
+      <span class="lg"><svg viewBox="-2 -18 12 20" width="10" height="16" aria-hidden="true"><g class="flag"><path d="M0 0 V-16"/><path class="ribbon" d="M0 -16 L8 -13 L0 -10Z"/></g></svg>watching</span>
+    </div>
+    <div class="lg-row"><span class="lg-title">Place</span>${places}</div>`;
+}
+
+/* ---------- sections ---------- */
+
+const kindChip = (k) => `<span class="kind kind-${esc(String(k).toLowerCase())}">${esc(k)}</span>`;
+
+function wateringSection() {
+  const items = G.thisWeek;
+  if (!items.length)
+    return `<section class="panel watering"><h2>This week's tending</h2>
+      <p class="muted">No tending planned this week.</p><button class="tool" data-run="/kin:tend">Tend this week</button></section>`;
+  const card = (t) => `<article class="wcard ${t.done ? "done" : ""}" data-wcard="${esc(t.name)}">
+      <div class="whead">${kindChip(t.kind)}<button class="linkish name" data-sheet="${esc(t.name)}">${esc(t.name)}</button>${t.done ? `<span class="settled">✓ tended</span>` : ""}</div>
+      ${t.gesture ? `<p class="gesture">${esc(t.gesture)}</p>` : ""}
+      ${t.done && t.outcome ? `<p class="outcome">${esc(t.outcome)}</p>` : ""}
+      <div class="ops">
+        ${t.done ? "" : `<button class="water" data-water="${esc(t.name)}">Tended</button>`}
+        <button class="tiny" data-run="/beeper:thread-reply ${esc(t.name)} — gesture: ${esc(t.gesture)}">Write</button>
+      </div>
+      <span class="wave" aria-hidden="true"></span>
+    </article>`;
+  return `<section class="panel watering"><h2>This week's tending ${G.week ? `<span class="sub">${esc(G.week.heading)}</span>` : ""}</h2>
+    ${G.week?.intro ? `<div class="html intro">${G.week.intro}</div>` : ""}
+    <div class="wgrid">${items.map(card).join("")}</div></section>`;
+}
+
+function askingSection() {
+  const asking = G.plants
+    .filter((p) => ["thirsty", "wilting"].includes(p.thirst) && ["core", "close", "new"].includes(p.ring) && !p.thisWeek)
+    .sort((a, b) => (b.daysSince ?? 0) - (a.daysSince ?? 0))
+    .slice(0, 5);
+  if (!asking.length) return "";
+  return `<section class="panel"><h2>Gone quiet</h2><div class="asks">${asking
+    .map((p) => `<div class="ask" data-wcard="${esc(p.name)}"><button class="linkish name" data-sheet="${esc(p.name)}">${esc(p.name)}</button>
+      <span class="muted">${esc(sinceText(p))}</span>
+      <span class="ops"><button class="water tiny" data-water="${esc(p.name)}">Tended</button><button class="tiny" data-run="/kin:tend focus on ${esc(p.name)}">Tend</button></span>
+      <span class="wave" aria-hidden="true"></span></div>`)
+    .join("")}</div></section>`;
+}
+
+function frostSection() {
   const { pinned, watch } = S.config;
   if (!pinned.length && !watch.length) return "";
-  const today = Date.now();
-  const card = (item, kind) => {
-    const it = typeof item === "string" ? { name: item } : item;
-    const until = day(it.until);
-    const soon = until && (new Date(until) - today) / 864e5 <= 14;
-    return `<div class="focus-card ${soon ? "soon" : ""}">
-      <div class="name">${esc(it.name)}${until ? ` <span class="place">· until ${esc(until)}</span>` : ""}</div>
-      ${it.why ? `<div class="why">${esc(it.why)}</div>` : ""}
-      ${personSub(findPerson(it.name))}
-      ${kind === "watch" || kind === "pin" ? personOps(it.name) : ""}
-    </div>`;
+  const ws = [...watch].sort((a, b) => (day(a.until) || "9999").localeCompare(day(b.until) || "9999"));
+  const row = (w) => {
+    const n = daysUntil(w.until);
+    const when = n == null ? "" : n < 0 ? "passed" : n === 0 ? "today" : `in ${n} day${n === 1 ? "" : "s"}`;
+    return `<li class="${n != null && n <= 7 ? "near" : ""}"><button class="linkish name" data-sheet="${esc(w.name)}">${esc(w.name)}</button>
+      ${w.until ? `<span class="when">${esc(day(w.until))} · ${when}</span>` : ""}<div class="why">${esc(w.why ?? "")}</div></li>`;
   };
+  const anchors = pinned.map((p) => (typeof p === "string" ? { name: p } : p));
   return `<section class="panel"><h2>Focus</h2>
-    ${pinned.length ? `<div class="label">Pinned</div><div class="focus-grid">${pinned.map((p) => card(p, "pin")).join("")}</div>` : ""}
-    ${watch.length ? `<div class="label">Watching</div><div class="focus-grid">${watch.map((w) => card(w, "watch")).join("")}</div>` : ""}
+    ${anchors.length ? `<div class="label">Pinned</div><ul class="frost anchors">${anchors.map((a) => `<li><button class="linkish name" data-sheet="${esc(a.name)}">${esc(a.name)}</button><div class="why">${esc(a.why ?? "")}</div></li>`).join("")}</ul>` : ""}
+    ${ws.length ? `<div class="label">Watching</div><ul class="frost">${ws.map(row).join("")}</ul>` : ""}
   </section>`;
 }
 
-function weakPanel() {
+function weatherSection() {
   const w = S.kin.exists && S.kin.weakPoints;
-  if (!w) return "";
-  return `<section class="panel"><h2>${esc(w.heading)}</h2><div class="html">${w.html}</div></section>`;
+  const other = S.kin.exists ? S.kin.other : [];
+  if (!w && !other.length) return "";
+  return `${w ? `<section class="panel weather"><h2>${esc(w.heading)}</h2><div class="html">${w.html}</div></section>` : ""}
+    ${other.length ? `<div class="minis">${other.map((o) => `<section class="panel mini"><h3>${esc(o.heading)}</h3><div class="html">${o.html}</div></section>`).join("")}</div>` : ""}`;
 }
 
-function personOps(name) {
-  const n = esc(name);
-  return `<div class="ops">
-    <button class="tiny" data-run="/kin:tend focus on ${n}">tend</button>
-    <button class="tiny" data-run="/kin:repair ${n}">repair</button>
-    <button class="tiny" data-run="/beeper:thread-reply ${n}">reply</button>
-  </div>`;
-}
-
-function personRow(p) {
-  const key = `${p.ring}:${p.name}`;
-  const name = p.linked ? `<a href="${obsidianLink(p.name)}">${esc(p.name)}</a>` : esc(p.name);
-  return `<div class="person">
-    <div class="row">
-      <span class="name">${name}</span>
-      ${p.place ? `<span class="place" title="${esc(p.placeLabel)}">${PLACE_ICON[p.place]} ${esc(p.placeLabel.replace(/^\S+\s*/, ""))}</span>` : p.placeLabel ? `<span class="place">${esc(p.placeLabel)}</span>` : ""}
-      ${p.draftsWaiting ? `<span class="badge" title="drafts not fully sent">${p.draftsWaiting}✎</span>` : ""}
-      ${p.lastThread ? `<span class="date">${esc(p.lastThread)}</span>` : ""}
-    </div>
-    ${p.note ? `<div class="note ${openNotes.has(key) ? "open" : ""}" data-note="${esc(key)}">${esc(p.note.replace(/\[\[([^\]|]+)(\|[^\]]+)?\]\]/g, "$1"))}</div>` : ""}
-    ${personOps(p.name)}
-  </div>`;
-}
-
-function ringsPanel() {
+function bedsSection() {
   if (!S.kin.exists) return "";
   const chips = ["all", "here", "land", "lisbon", "far"]
-    .map((k) => `<button class="chip ${placeFilter === k ? "on" : ""}" data-filter="${k}">${k === "all" ? "all" : `${PLACE_ICON[k]} ${k}`}</button>`)
+    .map((k) => `<button class="chip ${placeFilter === k ? "on" : ""}" data-filter="${k}">${k === "all" ? "all" : PLACE[k]}</button>`)
     .join("");
-  const rings = S.kin.rings
-    .map((r) => {
-      const people = r.people.filter((p) => placeFilter === "all" || p.place === placeFilter);
-      return `<div class="ring">
-        <h3>${esc(r.title)}</h3>
-        ${placeFilter === "all" && r.intro ? `<div class="intro html">${r.intro}</div>` : ""}
-        ${people.map(personRow).join("") || `<p class="muted" style="font-size:13px">No one here${placeFilter === "all" ? "" : " in this place"}.</p>`}
-        ${placeFilter === "all" && r.extra ? `<div class="intro html">${r.extra}</div>` : ""}
-      </div>`;
-    })
-    .join("");
-  const other = S.kin.other
-    .map((o) => `<section class="panel"><h2>${esc(o.heading)}</h2><div class="html">${o.html}</div></section>`)
-    .join("");
-  return `<section class="panel"><h2>Rings <span class="filters">${chips}</span></h2><div class="rings">${rings}</div></section>${other}`;
+  const beds = S.kin.rings.map((r) => {
+    const people = r.people.filter((p) => placeFilter === "all" || p.place === placeFilter);
+    const rows = people.map((p0) => {
+      const p = plantOf(p0.name) ?? p0;
+      return `<li><button class="linkish row" data-sheet="${esc(p.name)}"><i class="tdot t-${esc(p.thirst ?? "unknown")}"></i><span class="name">${esc(p.name)}</span>
+        ${p.place ? `<span class="pm place-${p.place}" title="${esc(p.placeLabel)}"></span>` : ""}
+        ${p.draftsWaiting ? `<span class="badge">${p.draftsWaiting}✎</span>` : ""}
+        <span class="since muted">${p.daysSince != null ? `${p.daysSince}d` : ""}</span></button></li>`;
+    }).join("");
+    return `<details class="bedlist" ${["core", "close"].includes(r.key) ? "open" : ""}><summary>${esc(r.title)} <span class="muted">${people.length}</span></summary>
+      ${placeFilter === "all" && r.intro ? `<div class="intro html">${r.intro}</div>` : ""}
+      <ul>${rows || `<li class="muted">No one here${placeFilter === "all" ? "" : " in this place"}.</li>`}</ul></details>`;
+  }).join("");
+  return `<section class="panel beds"><h2>Rings <span class="filters">${chips}</span></h2><div class="bedgrid">${beds}</div></section>`;
 }
 
-function tendingPanel() {
-  const t = S.tending;
-  const body = t && t.latest.length
-    ? t.latest.map((b) => `<h3>${esc(b.heading)}</h3><div class="html">${b.html}</div>`).join("")
-    : `<p class="muted">No tending log yet. Run <em>Tend this week</em>.</p>`;
-  return `<section class="panel"><h2>Tending</h2>${body}</section>`;
-}
-
-function innerPanel() {
+function soilSection() {
   const { psychology, territory } = S.inner;
   if (!psychology && !territory) return "";
   const col = (title, note) =>
     note ? `<div><div class="label">${esc(title)}${note.updated ? ` · ${esc(day(note.updated))}` : ""}</div>
       ${note.sections.map((s) => `<h3>${esc(s.heading)}</h3><div class="html">${s.html}</div>`).join("")}</div>` : "";
   const veiled = S.config.innerVeiled && !unveiled;
-  return `<section class="panel"><h2>Inner work ${S.config.innerVeiled && unveiled ? `<button class="tiny ghost" data-veil>veil again</button>` : ""}</h2>
+  return `<section class="panel soil"><h2>Inner work ${S.config.innerVeiled && unveiled ? `<button class="tiny ghost" data-veil>veil again</button>` : ""}</h2>
     <div class="veil ${veiled ? "veiled" : ""}">
       <div class="veil-body inner-cols">${col("Own psychology", psychology)}${col("Own territory", territory)}</div>
       <div class="veil-cover"><button data-unveil>Tap to unveil</button></div>
     </div></section>`;
 }
 
+function journalSection() {
+  const t = S.tending;
+  const log = t && t.latest.length ? t.latest.map((b) => `<h3>${esc(b.heading)}</h3><div class="html">${b.html}</div>`).join("") : `<p class="muted">No tending log yet.</p>`;
+  return `<details class="panel journal"><summary><h2>Tending log</h2></summary>
+    ${log}
+    ${S.config.changes ? `<div class="label">How the hearth has changed</div><div class="html">${S.config.changes}</div>` : ""}
+  </details>`;
+}
+
+/* ---------- person sheet ---------- */
+
+function openSheet(name) {
+  const p = plantOf(name);
+  const w = G.thisWeek.find((t) => t.name === name);
+  const n = esc(name);
+  if (!p) { toast(`${name} is not in the kin map.`); return; }
+  $("#sheet").innerHTML = `<form method="dialog" class="sheet-close"><button class="ghost" aria-label="Close">✕</button></form>
+    <h2>${p.linked ? `<a href="${obsidianLink(p.name)}">${n}</a>` : n}</h2>
+    <p class="muted">${esc(RING_NAME[p.ring])}${p.placeLabel ? ` · ${esc(p.placeLabel)}` : ""}</p>
+    <p class="since-line t-${esc(p.thirst)}"><i class="tdot t-${esc(p.thirst)}"></i>${esc(sinceText(p))}${p.lastTendedFrom ? ` <span class="muted">· from ${esc(FROM[p.lastTendedFrom] ?? p.lastTendedFrom)}</span>` : ""}</p>
+    ${p.note ? `<p class="note">${esc(p.note.replace(/\[\[([^\]|]+)(\|[^\]]+)?\]\]/g, "$1"))}</p>` : ""}
+    ${p.draftsWaiting ? `<p><span class="badge">${p.draftsWaiting} draft${p.draftsWaiting > 1 ? "s" : ""} not fully sent</span></p>` : ""}
+    ${w ? `<div class="sheet-box">${kindChip(w.kind)} <strong>This week</strong><p>${esc(w.gesture)}</p>${w.done ? `<p class="outcome">✓ ${esc(w.outcome || "tended")}</p>` : ""}</div>` : ""}
+    ${p.pinned ? `<div class="sheet-box"><strong>Pinned</strong><p>${esc(p.pinned)}</p></div>` : ""}
+    ${p.watch ? `<div class="sheet-box"><strong>Watching${p.watch.until ? ` until ${esc(day(p.watch.until))}` : ""}</strong><p>${esc(p.watch.why ?? "")}</p></div>` : ""}
+    <div class="ops sheet-ops">
+      <button class="water" data-water="${n}">Tended</button>
+      <button class="tiny" data-run="/beeper:thread-reply ${n}${w?.gesture ? ` — gesture: ${esc(w.gesture)}` : ""}">Write</button>
+      <button class="tiny" data-run="/kin:tend focus on ${n}">Tend</button>
+      <button class="tiny" data-run="/kin:repair ${n}">Repair</button>
+      ${p.linked ? `<a class="tiny btnlike" href="${obsidianLink(p.name)}">Open in Obsidian</a>` : ""}
+    </div>`;
+  $("#sheet").showModal();
+}
+
+/* ---------- tooltip ---------- */
+
+function showTip(g) {
+  const p = plantOf(g.dataset.plant);
+  if (!p) return;
+  const tip = $("#tip");
+  tip.innerHTML = `<strong>${esc(p.name)}</strong><span>${esc(sinceText(p))}</span>${p.note ? `<span class="muted">${esc(p.note.replace(/\[\[([^\]|]+)(\|[^\]]+)?\]\]/g, "$1").slice(0, 110))}${p.note.length > 110 ? "…" : ""}</span>` : ""}`;
+  tip.hidden = false;
+  const wrap = $(".garden-wrap").getBoundingClientRect();
+  const r = g.getBoundingClientRect();
+  const x = Math.min(Math.max(r.left + r.width / 2 - wrap.left, 110), wrap.width - 110);
+  tip.style.left = `${x}px`;
+  tip.style.top = `${r.top - wrap.top - 8}px`;
+}
+const hideTip = () => ($("#tip").hidden = true);
+
+$("#garden").addEventListener("mouseover", (e) => { const g = e.target.closest(".plant"); g ? showTip(g) : hideTip(); });
+$("#garden").addEventListener("mouseleave", hideTip);
+$("#garden").addEventListener("focusin", (e) => { const g = e.target.closest(".plant"); if (g) showTip(g); });
+$("#garden").addEventListener("focusout", hideTip);
+$("#garden").addEventListener("keydown", (e) => {
+  const g = e.target.closest(".plant");
+  if (g && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openSheet(g.dataset.plant); }
+});
+
+/* ---------- clicks ---------- */
+
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-action],[data-run],[data-filter],[data-note],[data-unveil],[data-veil]");
+  const plant = e.target.closest(".plant[data-plant]");
+  if (plant && plant.closest("#garden")) { hideTip(); openSheet(plant.dataset.plant); return; }
+  const t = e.target.closest("[data-action],[data-run],[data-filter],[data-unveil],[data-veil],[data-sheet],[data-water]");
   if (!t) return;
-  if (t.dataset.action != null) startNew(S.config.actions[+t.dataset.action].prompt);
-  else if (t.dataset.run != null) startNew(t.dataset.run);
+  if (t.dataset.water != null) {
+    const name = t.dataset.water;
+    const card = t.closest("[data-wcard]") ?? document.querySelector(`#garden .plant[data-plant="${CSS.escape(name)}"]`);
+    if ($("#sheet").open) $("#sheet").close();
+    const inGarden = document.querySelector(`#garden .plant[data-plant="${CSS.escape(name)}"]`);
+    inGarden?.classList.add("rippling");
+    water(name, card);
+  } else if (t.dataset.action != null) startNew(S.config.actions[+t.dataset.action].prompt);
+  else if (t.dataset.run != null) { if ($("#sheet").open) $("#sheet").close(); startNew(t.dataset.run); }
+  else if (t.dataset.sheet != null) openSheet(t.dataset.sheet);
   else if (t.dataset.filter) { placeFilter = t.dataset.filter; render(); }
-  else if (t.dataset.note) {
-    openNotes.has(t.dataset.note) ? openNotes.delete(t.dataset.note) : openNotes.add(t.dataset.note);
-    t.classList.toggle("open");
-  } else if (t.hasAttribute("data-unveil")) { unveiled = true; render(); }
+  else if (t.hasAttribute("data-unveil")) { unveiled = true; render(); }
   else if (t.hasAttribute("data-veil")) { unveiled = false; render(); }
 });
+$("#sheet").addEventListener("click", (e) => { if (e.target === $("#sheet")) $("#sheet").close(); });
 
 function listen() {
   const es = new EventSource("/api/events");
   let timer;
+  let opened = false;
+  // After a server restart the stream reconnects: reload in case we missed changes.
+  es.onopen = () => { if (opened) load(); opened = true; };
   es.onmessage = (m) => {
     try {
-      if (JSON.parse(m.data).type === "vault") { clearTimeout(timer); timer = setTimeout(load, 300); }
+      if (JSON.parse(m.data).type === "vault") { clearTimeout(timer); timer = setTimeout(() => { watered.clear(); load(); }, 300); }
     } catch {}
   };
+}
+
+/* ---------- chat drawer: collapse to a rail ---------- */
+
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+function setCollapsed(on) {
+  document.body.classList.toggle("chat-collapsed", on);
+  store.set("hearth.chatCollapsed", on ? "1" : "0");
+}
+setCollapsed(store.get("hearth.chatCollapsed") === "1");
+$("#collapseChat").onclick = () => setCollapsed(true);
+$("#rail").onclick = () => setCollapsed(false);
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "\\" || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.target.closest("input,textarea,select,[contenteditable]") || $("#sheet").open) return;
+  e.preventDefault();
+  setCollapsed(!document.body.classList.contains("chat-collapsed"));
+});
+let waitingPermissions = 0;
+function updateRailDot() {
+  const dot = $("#railDot");
+  dot.hidden = !(running || waitingPermissions);
+  dot.classList.toggle("ask", waitingPermissions > 0);
+  $("#rail").title = waitingPermissions ? "Claude is waiting for your approval" : running ? "Claude is working" : "Open the conversation (\\)";
 }
 
 /* ---------- chat ---------- */
@@ -226,10 +507,11 @@ function setRunning(on, status = "") {
   $("#stop").hidden = !on;
   $("#send").disabled = on;
   $("#chatStatus").textContent = status || (on ? "thinking…" : sessionId ? "listening" : "");
+  updateRailDot();
 }
 
 function startNew(prompt) {
-  if (running) { append("msg error", "A turn is still running. Stop it first."); return; }
+  if (running) { openChat(); append("msg error", "A turn is still running. Stop it first."); return; }
   sessionId = null;
   $("#log").innerHTML = "";
   openChat();
@@ -265,6 +547,7 @@ async function send(message) {
   } catch (e) {
     append("msg error", esc(e.message));
   } finally {
+    waitingPermissions = 0;
     setRunning(false);
   }
 }
@@ -285,10 +568,14 @@ function handle(ev) {
       break;
     case "permission": {
       bubble = null; bubbleText = "";
+      waitingPermissions++;
+      updateRailDot();
       const el = append("perm", `<strong>Claude wants to use ${esc(ev.tool)}</strong><pre>${esc(ev.summary)}</pre>
         <div class="chat-buttons"><button class="ghost" data-deny>Deny</button><button class="primary" data-allow>Allow</button></div>`);
       const decide = async (allow) => {
         $(".chat-buttons", el).outerHTML = `<div class="done">${allow ? "Allowed" : "Denied"}</div>`;
+        waitingPermissions = Math.max(0, waitingPermissions - 1);
+        updateRailDot();
         await fetch("/api/permission", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: ev.id, allow }) });
       };
       $("[data-allow]", el).onclick = () => decide(true);
@@ -320,7 +607,7 @@ $("#newChat").onclick = () => {
   $("#log").innerHTML = `<p class="muted hint">New conversation.</p>`;
   setRunning(false);
 };
-function openChat() { $("#chat").classList.add("open"); }
+function openChat() { $("#chat").classList.add("open"); setCollapsed(false); }
 $("#openChat").onclick = openChat;
 $("#closeChat").onclick = () => $("#chat").classList.remove("open");
 
