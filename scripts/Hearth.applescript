@@ -13,7 +13,15 @@ on isUp()
 	end try
 end isUp
 
-if not isUp() then
+if isUp() then
+	-- Already running: open it, or stop the server listening on Hearth's port.
+	set choice to button returned of (display dialog "Hearth is running." buttons {"Stop", "Open"} default button "Open" with title "Hearth" with icon (path to resource "applet.icns"))
+	if choice is "Stop" then
+		do shell script "lsof -ti tcp:4747 -sTCP:LISTEN | xargs kill"
+		display notification "The server is stopped." with title "Hearth"
+		return
+	end if
+else
 	-- Apps launched from Finder get a bare PATH; skills need obsidian, python3 and friends.
 	-- Run from the repo so Bun loads .env, and detach fully so this launcher returns at once.
 	do shell script "export PATH=\"/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.volta/bin:$HOME/.bun/bin:/usr/bin:/bin:/usr/sbin:/sbin\"; cd " & repoPath & " && (nohup " & bunPath & " src/server.ts >> " & logPath & " 2>&1 < /dev/null &)"
