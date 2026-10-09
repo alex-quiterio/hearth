@@ -33,8 +33,12 @@ async function load() {
   } catch (e) {
     // Never stay stuck: say so and keep trying (the server may be restarting).
     console.warn("state failed", e);
-    if (!S) $("#garden").innerHTML = `<p class="muted relight">The fire went out, relighting…</p>`;
-    else toast("The fire went out, relighting…");
+    if (!S) {
+      if (!$("#garden .ember-game")) {
+        $("#garden").innerHTML = `<p class="muted relight">The fire went out, relighting… Keep this ember going while you wait.</p><div class="ember-slot"></div>`;
+        window.emberGame?.($("#garden .ember-slot"));
+      }
+    } else toast("The fire went out, relighting…");
     retry = setTimeout(load, 2000);
   }
 }
@@ -274,7 +278,15 @@ function wateringSection() {
     </article>`;
   return `<section class="panel watering"><h2>This week's tending ${G.week ? `<span class="sub">${esc(G.week.heading)}</span>` : ""}</h2>
     ${G.week?.intro ? `<div class="html intro">${G.week.intro}</div>` : ""}
-    <div class="wgrid">${items.map(card).join("")}</div></section>`;
+    ${wgroup("Still to tend", items.filter((t) => !t.done), card, "Everyone is tended this week.")}
+    ${wgroup("Tended", items.filter((t) => t.done), card)}</section>`;
+}
+
+/** One group of this week's cards, with its count. Empty groups disappear unless they have something to say. */
+function wgroup(title, list, card, empty = "") {
+  if (!list.length) return empty ? `<h3 class="wgroup">${title}</h3><p class="muted">${empty}</p>` : "";
+  return `<h3 class="wgroup">${title} <span class="count">${list.length}</span></h3>
+    <div class="wgrid">${list.map(card).join("")}</div>`;
 }
 
 function askingSection() {
@@ -490,6 +502,7 @@ function append(cls, html) {
   el.innerHTML = html;
   $("#log").appendChild(el);
   if (work) $("#log").appendChild(work);
+  if (queueEl) $("#log").appendChild(queueEl);
   scrollLog();
   return el;
 }
@@ -534,6 +547,7 @@ function showWork() {
     work.innerHTML = `<span class="ember" aria-hidden="true"><i></i><i></i><i></i></span><span class="work-text"></span><span class="work-time muted"></span>`;
   }
   $("#log").appendChild(work); // move to the bottom
+  if (queueEl) $("#log").appendChild(queueEl);
   renderWork();
   scrollLog();
 }
@@ -542,7 +556,7 @@ function setActivity(text) { workText = text; renderWork(); }
 function setRunning(on, status = "") {
   running = on;
   $("#stop").hidden = !on;
-  $("#send").disabled = on;
+  $("#send").textContent = on ? "Queue" : "Send";
   document.body.classList.toggle("claude-working", on);
   clearInterval(workTimer);
   if (on) {
@@ -557,6 +571,107 @@ function setRunning(on, status = "") {
   }
   updateRailDot();
   syncProposal();
+}
+
+/* Messages written while Claude works wait here and go out together when the turn ends.
+   After Stop they return to the input instead, so nothing is sent he did not mean to. */
+let queue = [];
+let queueEl = null;
+let stopAsked = false;
+
+function renderQueue() {
+  if (!queue.length) { queueEl?.remove(); queueEl = null; return; }
+  if (!queueEl) { queueEl = document.createElement("div"); queueEl.className = "queue"; }
+  queueEl.innerHTML = queue.map((m, i) => `<div class="msg user queued"><span class="queued-text">${esc(m)}</span>
+    <div class="queued-meta">Queued · <button type="button" class="linkish" data-unqueue="${i}">remove</button></div></div>`).join("");
+  queueEl.querySelectorAll("[data-unqueue]").forEach((b) => (b.onclick = () => { queue.splice(+b.dataset.unqueue, 1); renderQueue(); }));
+  $("#log").appendChild(queueEl);
+  scrollLog();
+}
+
+function flushQueue() {
+  if (!queue.length) return;
+  const text = queue.join("\n\n");
+  queue = []; renderQueue();
+  if (stopAsked) {
+    const box = $("#input");
+    box.value = box.value.trim() ? `${text}\n\n${box.value}` : text;
+    box.focus();
+  } else send(text);
+}
+
+/* Attachments: the browser hides real paths, so files go to the server and Claude reads the copy.
+   A note dragged from Obsidian arrives as an obsidian:// link and is read in place in the vault. */
+let attachments = []; // { id, name, path?, ready: Promise, error? }
+
+function renderAttachments() {
+  const box = $("#attachments");
+  box.hidden = !attachments.length;
+  box.innerHTML = attachments.map((a) => `<span class="chip ${a.path ? "" : a.error ? "failed" : "loading"}" title="${esc(a.error || a.path || "Uploading…")}">
+    ${esc(a.name)}<button type="button" class="linkish" data-unattach="${a.id}" aria-label="Remove ${esc(a.name)}">×</button></span>`).join("");
+  box.querySelectorAll("[data-unattach]").forEach((b) => (b.onclick = () => {
+    attachments = attachments.filter((a) => a.id !== b.dataset.unattach);
+    renderAttachments();
+  }));
+}
+
+function attach(form, names) {
+  const items = names.map((name) => ({ id: crypto.randomUUID(), name }));
+  const ready = fetch("/api/attach", { method: "POST", body: form })
+    .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); return j; })
+    .then((saved) => items.forEach((it, i) => Object.assign(it, saved[i])))
+    .catch((e) => items.forEach((it) => (it.error = e.message)))
+    .finally(renderAttachments);
+  items.forEach((it) => (it.ready = ready));
+  attachments.push(...items);
+  renderAttachments();
+}
+
+function attachFiles(files) {
+  if (!files.length) return;
+  const form = new FormData();
+  for (const f of files) form.append("file", f, f.name || "pasted.png");
+  attach(form, [...files].map((f) => f.name || "pasted image"));
+}
+
+function attachObsidian(uris) {
+  const form = new FormData();
+  uris.forEach((u) => form.append("obsidian", u));
+  attach(form, uris.map((u) => new URL(u).searchParams.get("file")?.split("/").pop() || "note"));
+}
+
+/** The message as Claude gets it: the text, then one line per attached path. Clears the chips. */
+async function withAttachments(text) {
+  const list = attachments;
+  attachments = []; renderAttachments();
+  await Promise.all(list.map((a) => a.ready));
+  const ok = list.filter((a) => a.path);
+  list.filter((a) => a.error).forEach((a) => append("msg error", esc(`${a.name}: ${a.error}`)));
+  if (!ok.length) return text;
+  return `${text.trim() || "Have a look at this."}\n\nAttached:\n${ok.map((a) => `- ${a.path}`).join("\n")}`;
+}
+
+$("#attach").onclick = () => $("#file").click();
+$("#file").onchange = (e) => { attachFiles(e.target.files); e.target.value = ""; };
+$("#input").addEventListener("paste", (e) => {
+  const files = [...(e.clipboardData?.files ?? [])];
+  if (files.length) { e.preventDefault(); attachFiles(files); }
+});
+{
+  const chat = $("#chat");
+  let depth = 0;
+  chat.addEventListener("dragenter", (e) => { e.preventDefault(); depth++; chat.classList.add("dropping"); });
+  chat.addEventListener("dragleave", () => { if (--depth <= 0) { depth = 0; chat.classList.remove("dropping"); } });
+  chat.addEventListener("dragover", (e) => e.preventDefault());
+  chat.addEventListener("drop", (e) => {
+    e.preventDefault();
+    depth = 0; chat.classList.remove("dropping");
+    const dt = e.dataTransfer;
+    const links = `${dt.getData("text/uri-list")}\n${dt.getData("text/plain")}`.split(/\s+/).filter((l) => l.startsWith("obsidian://"));
+    if (links.length) attachObsidian([...new Set(links)]);
+    else attachFiles(dt.files);
+    openChat();
+  });
 }
 
 /* Buttons never send on their own: they propose a prompt, and Alex confirms where it goes.
@@ -610,7 +725,9 @@ function syncProposal() {
 }
 
 async function send(message) {
-  if (!message.trim() || running) return;
+  if (!message.trim()) return;
+  if (running) { queue.push(message.trim()); renderQueue(); return; }
+  stopAsked = false;
   append("msg user", esc(message));
   bubble = null; bubbleText = "";
   setRunning(true);
@@ -640,6 +757,7 @@ async function send(message) {
   } finally {
     waitingPermissions = 0;
     setRunning(false);
+    flushQueue();
   }
 }
 
@@ -685,16 +803,17 @@ function handle(ev) {
   }
 }
 
-$("#form").addEventListener("submit", (e) => {
+$("#form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const v = $("#input").value;
+  if (!v.trim() && !attachments.length) return;
   $("#input").value = "";
-  send(v);
+  send(await withAttachments(v));
 });
 $("#input").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#form").requestSubmit(); }
 });
-$("#stop").onclick = () => fetch("/api/stop", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+$("#stop").onclick = () => (stopAsked = true, fetch("/api/stop", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }));
 $("#newChat").onclick = () => {
   if (running) return;
   if ($(".msg", $("#log")) && !confirm("Start a new conversation? This one stays in Claude Code's history but leaves this panel.")) return;
@@ -718,7 +837,9 @@ $("#shutdown").onclick = async () => {
   clearTimeout(retry);
   events?.close();
   document.body.innerHTML = `<main class="stopped"><h1>Hearth is resting</h1>
-    <p class="muted">The server is stopped. Open <strong>Hearth.app</strong> on your Desktop to light it again.</p></main>`;
+    <p class="muted">The server is stopped. Open <strong>Hearth.app</strong> on your Desktop to light it again.</p>
+    <p class="muted">Meanwhile, one small ember is still going:</p><div class="ember-slot"></div></main>`;
+  window.emberGame?.($(".stopped .ember-slot"));
   document.title = "Hearth (stopped)";
 };
 

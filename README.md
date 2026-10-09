@@ -34,6 +34,13 @@ pandora vault ──read──▶ hearth (Bun server) ──▶ browser dashboar
   change under `## Changes`. The "Tend the hearth" button asks Claude to reshape it on
   purpose.
 
+## Attachments
+
+Drop files on the chat, paste an image, or use 📎. The browser never reveals a file's path, so
+the page uploads a copy to `$TMPDIR/hearth-attachments` (swept after a day) and the message
+lists its path for Claude to read. A note dragged in from Obsidian is not copied: it is read
+in place in the vault.
+
 ## Permissions
 
 Reads, skills and plain `obsidian …` CLI calls run without asking. Everything else shows an

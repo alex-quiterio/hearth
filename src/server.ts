@@ -1,9 +1,10 @@
 import { join } from "node:path";
 import { watch } from "node:fs";
-import { findVault, state, lastChange, kinState, kinPeople, PATHS } from "./vault";
+import { findVault, state, lastChange, kinState, kinPeople, PATHS, VAULT_NAME } from "./vault";
 import { waterPlant } from "./garden";
 import { chat, answerPermission, stop } from "./agent";
 import { sessions, transcript, forget } from "./history";
+import { saveAttachment, vaultFile, sweepAttachments, type Attachment } from "./attach";
 
 const vault = await findVault();
 const PORT = Number(process.env.HEARTH_PORT ?? 4747);
@@ -32,6 +33,9 @@ setInterval(async () => {
   }
 }, 5000);
 
+sweepAttachments();
+setInterval(sweepAttachments, 3600 * 1000);
+
 const sse = (e: unknown) => `data: ${JSON.stringify(e)}\n\n`;
 
 Bun.serve({
@@ -41,6 +45,7 @@ Bun.serve({
   routes: {
     "/": () => new Response(Bun.file(join(PUBLIC, "index.html"))),
     "/app.js": () => new Response(Bun.file(join(PUBLIC, "app.js"))),
+    "/ember.js": () => new Response(Bun.file(join(PUBLIC, "ember.js"))),
     "/style.css": () => new Response(Bun.file(join(PUBLIC, "style.css"))),
     "/favicon.svg": () => new Response(Bun.file(join(PUBLIC, "favicon.svg"))),
     "/favicon.ico": () => new Response(Bun.file(join(PUBLIC, "favicon.svg")), { headers: { "content-type": "image/svg+xml" } }),
@@ -71,7 +76,7 @@ Bun.serve({
         const stream = new ReadableStream({
           async start(c) {
             try {
-              for await (const e of chat(message, sessionId)) c.enqueue(enc.encode(sse(e)));
+              for await (const e of chat(message, vault, sessionId)) c.enqueue(enc.encode(sse(e)));
             } catch (e) {
               c.enqueue(enc.encode(sse({ type: "error", message: (e as Error).message })));
             }
@@ -79,6 +84,25 @@ Bun.serve({
           },
         });
         return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } });
+      },
+    },
+
+    // Multipart "file" fields are copied to the attachments folder; "obsidian" fields are vault links.
+    "/api/attach": {
+      POST: async (req) => {
+        const form = await req.formData();
+        const out: Attachment[] = [];
+        try {
+          for (const f of form.getAll("file")) if (typeof f !== "string") out.push(await saveAttachment(f));
+          for (const uri of form.getAll("obsidian")) {
+            const hit = await vaultFile(String(uri), vault, VAULT_NAME);
+            if (!hit) return Response.json({ error: `not a note in ${VAULT_NAME}: ${uri}` }, { status: 404 });
+            out.push(hit);
+          }
+        } catch (e) {
+          return Response.json({ error: (e as Error).message }, { status: 413 });
+        }
+        return Response.json(out);
       },
     },
 

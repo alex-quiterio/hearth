@@ -1,4 +1,5 @@
 import { query, type CanUseTool, type PermissionResult } from "@anthropic-ai/claude-agent-sdk";
+import { resolve, sep } from "node:path";
 
 // One Claude Code session per conversation, resumed turn by turn. It loads the user's
 // settings, so every installed buchecha plugin and its skills are there as in the terminal.
@@ -32,12 +33,51 @@ const READ_ONLY = new Set(["Read", "Glob", "Grep", "Skill", "ToolSearch", "WebSe
 // Anything on Beeper that changes the outside world asks first, every time.
 const BEEPER_WRITE = /send|edit|delete|archive|mark|react|set_|create|update|remind|pin|mute/i;
 
-/** Pre-approve what the skills do all day (read, and write notes through the Obsidian CLI); ask for the rest. */
-export function autoAllowed(tool: string, input: Record<string, unknown>): boolean {
+// Shell commands that only look. Read is already free for any path, so these add no reach.
+const LOOK = new Set(["cat", "head", "tail", "grep", "rg", "ls", "find", "wc", "date", "echo", "sort", "cut", "stat", "file", "pwd"]);
+
+/** A command split on ; && || | and newlines outside quotes, or null if it substitutes ($, `) or redirects. */
+export function shellParts(cmd: string): string[] | null {
+  const plain = cmd.replace(/\s\d?>\s*(&1|\/dev\/null)/g, " ");
+  const parts: string[] = [];
+  let cur = "", q = "";
+  for (let i = 0; i < plain.length; i++) {
+    const c = plain[i]!;
+    if (q) {
+      if (c === q) q = "";
+      else if (q === '"' && (c === "$" || c === "`")) return null;
+      else if (q === '"' && c === "\\") { cur += c + (plain[++i] ?? ""); continue; }
+      cur += c;
+    } else if (c === "'" || c === '"') { q = c; cur += c; }
+    else if (c === "$" || c === "`" || c === ">" || c === "<" || c === "(") return null;
+    else if (c === ";" || c === "|" || c === "&" || c === "\n") { if (cur.trim()) parts.push(cur.trim()); cur = ""; }
+    else cur += c;
+  }
+  if (q) return null;
+  if (cur.trim()) parts.push(cur.trim());
+  return parts;
+}
+
+function partAllowed(part: string): boolean {
+  const word = part.split(/\s+/)[0] ?? "";
+  if (word === "obsidian") return !/\bdelete\b|\bmove\b|\brename\b/.test(part);
+  if (word === "find") return !/\s-(exec|execdir|ok|okdir|delete|fprint|fprintf|fls)\b/.test(part);
+  if (word === "sort") return !/\s(-o|--output)\b/.test(part);
+  if (word === "rg") return !/\s--pre\b/.test(part);
+  return LOOK.has(word);
+}
+
+/** Pre-approve what the skills do all day: read, look around, and write notes in the vault
+ *  (through the Obsidian CLI or straight to the file). Ask for the rest. */
+export function autoAllowed(tool: string, input: Record<string, unknown>, vault?: string): boolean {
   if (READ_ONLY.has(tool)) return true;
   if (tool === "Bash") {
-    const cmd = String(input.command ?? "").trim();
-    return /^obsidian\s/.test(cmd) && !/[;&|`$]/.test(cmd) && !/\bdelete\b|\bmove\b|\brename\b/.test(cmd);
+    const parts = shellParts(String(input.command ?? ""));
+    return !!parts?.length && parts.every(partAllowed);
+  }
+  if ((tool === "Edit" || tool === "Write") && vault && typeof input.file_path === "string") {
+    const root = resolve(vault), path = resolve(input.file_path);
+    return path.startsWith(root + sep) && !path.slice(root.length).split(sep).some((s) => s.startsWith("."));
   }
   if (tool.startsWith("mcp__beeper__")) return !BEEPER_WRITE.test(tool.slice("mcp__beeper__".length));
   return false;
@@ -69,9 +109,11 @@ export function summarize(tool: string, input: Record<string, unknown>): string 
   return s.length > 400 ? s.slice(0, 400) + "…" : s;
 }
 
-const APPEND = `You are running inside Hearth, Alex's local dashboard over his vault "pandora". He talks to you in a chat pane, not a terminal: ask questions in plain text (AskUserQuestion is unavailable) and keep replies short enough to read in a side panel. The dashboard re-reads the vault as soon as a skill writes to it, and its own configuration is the note "4 - Archive/kin/Hearth.md" (frontmatter: pinned, watch, actions, panels). When a session changes what matters (someone to keep an eye on, a date, a repair underway, a new routine worth a button), update that frontmatter and add one dated line under "## Changes" saying what changed and why.`;
+const append = (vault: string) => `You are running inside Hearth, Alex's local dashboard over his vault "pandora". He talks to you in a chat pane, not a terminal: ask questions in plain text (AskUserQuestion is unavailable) and keep replies short enough to read in a side panel. The dashboard re-reads the vault as soon as a skill writes to it, and its own configuration is the note "4 - Archive/kin/Hearth.md" (frontmatter: pinned, watch, actions, panels). When a session changes what matters (someone to keep an eye on, a date, a repair underway, a new routine worth a button), update that frontmatter and add one dated line under "## Changes" saying what changed and why.
 
-export async function* chat(message: string, sessionId?: string): AsyncGenerator<ChatEvent> {
+The vault is at ${vault}. To write a note, use Edit or Write on its file there, or one plain \`obsidian\` command; both run without asking Alex. Do not wrap vault writes in python or shell scripts: every one of those stops him for approval.`;
+
+export async function* chat(message: string, vault: string, sessionId?: string): AsyncGenerator<ChatEvent> {
   running?.abort();
   const abort = new AbortController();
   running = abort;
@@ -83,7 +125,7 @@ export async function* chat(message: string, sessionId?: string): AsyncGenerator
   };
 
   const canUseTool: CanUseTool = async (tool, input, { signal }) => {
-    if (autoAllowed(tool, input)) return { behavior: "allow", updatedInput: input };
+    if (autoAllowed(tool, input, vault)) return { behavior: "allow", updatedInput: input };
     const id = crypto.randomUUID();
     push({ type: "permission", id, tool, summary: summarize(tool, input) });
     return new Promise<PermissionResult>((resolve) => {
@@ -102,7 +144,7 @@ export async function* chat(message: string, sessionId?: string): AsyncGenerator
       permissionMode: "default",
       canUseTool,
       disallowedTools: ["AskUserQuestion", "EnterPlanMode", "ExitPlanMode"],
-      systemPrompt: { type: "preset", preset: "claude_code", append: APPEND },
+      systemPrompt: { type: "preset", preset: "claude_code", append: append(vault) },
     },
   });
 

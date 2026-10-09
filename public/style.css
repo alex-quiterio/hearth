@@ -155,6 +155,8 @@ h1::before { content: ""; display: inline-block; width: 12px; height: 12px; bord
 .html ul, .html ol { padding-left: 20px; }
 .intro { color: var(--ink-2); font-size: 14px; }
 
+.wgroup { margin: 16px 0 8px; font-family: Inter, system-ui, sans-serif; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.wgroup .count { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); letter-spacing: 0; }
 .wgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
 .wcard, .ask { position: relative; overflow: hidden; background: var(--surface-2); border-radius: 14px; padding: 12px 14px; border: 1px solid transparent; }
 .whead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -254,6 +256,13 @@ button.name { cursor: pointer; } button.name:hover { color: var(--clay-ink); }
 .chat-input { border-top: 1px solid var(--line); padding: 12px 16px; display: grid; gap: 8px; }
 .chat-input textarea { width: 100%; resize: vertical; font: inherit; font-size: 14.5px; border: 1px solid var(--line); border-radius: 12px; padding: 9px 11px; background: var(--bg); color: var(--ink); }
 .chat-buttons { display: flex; justify-content: flex-end; gap: 8px; }
+.chat-buttons .attach { margin-right: auto; padding-inline: 10px; }
+.attachments { display: flex; flex-wrap: wrap; gap: 6px; }
+.attachments .chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; font-size: 12.5px; padding: 3px 6px 3px 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); overflow-wrap: anywhere; }
+.attachments .chip.loading { opacity: .6; }
+.attachments .chip.failed { border-color: var(--clay); color: var(--clay-ink); }
+.attachments .chip button { font-size: 15px; line-height: 1; padding: 0 4px; color: var(--muted); }
+.chat.dropping { outline: 2px dashed var(--moss); outline-offset: -6px; }
 .chat-buttons .primary, #send { background: var(--moss); color: #fff; border-color: var(--moss); }
 #send:disabled { opacity: .5; }
 
@@ -312,12 +321,20 @@ body.claude-working .chat-fab { animation: glow 1.6s ease-in-out infinite; }
   .ember i { opacity: 1; }
 }
 body.claude-working #stop { border-color: var(--clay); color: var(--clay-ink); font-weight: 600; }
-body.claude-working #send { display: none; }
+body.claude-working #send { background: transparent; color: var(--moss); }
+.queue { display: contents; }
+.msg.user.queued { background: transparent; color: var(--ink); border: 1.5px dashed var(--clay); }
+.queued-text { white-space: pre-wrap; }
+.queued-meta { margin-top: 4px; font-size: 12px; color: var(--muted); text-align: right; }
+.queued-meta .linkish { font-size: 12px; }
 
 .top { position: relative; }
 .power { position: absolute; top: 4px; right: 0; font-size: 12.5px; padding: 5px 11px; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; }
 .power:hover { color: var(--clay-ink); border-color: var(--clay); }
-.stopped { max-width: 520px; margin: 18vh auto; padding: 0 16px; text-align: center; }
+.stopped { max-width: 520px; margin: 10vh auto; padding: 0 16px; text-align: center; }
+.ember-game { max-width: 480px; margin: 12px auto 0; }
+.ember-game canvas { display: block; width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--line); touch-action: none; cursor: none; }
+.ember-help { font-size: 12.5px; text-align: center; margin: 8px 0 0; }
 
 /* A prompt from a button, waiting for Alex to confirm where it goes */
 .proposal { align-self: stretch; padding: 12px; border-radius: 14px; background: var(--surface); border: 1.5px dashed var(--clay); display: flex; flex-direction: column; gap: 8px; }

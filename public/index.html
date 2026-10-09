@@ -55,8 +55,11 @@
         <p class="muted hint">Pick an action above, or a person's tend / repair / write, or just write.</p>
       </div>
       <form class="chat-input" id="form">
+        <div class="attachments" id="attachments" hidden></div>
         <textarea id="input" rows="2" placeholder="Write to Claude… (Enter to send, Shift+Enter for a new line)"></textarea>
         <div class="chat-buttons">
+          <input type="file" id="file" multiple hidden>
+          <button type="button" class="ghost attach" id="attach" title="Attach files (or drop them here, or paste an image)" aria-label="Attach files">📎</button>
           <button type="button" class="ghost" id="stop" hidden>Stop</button>
           <button type="submit" id="send">Send</button>
         </div>
@@ -66,6 +69,7 @@
 
   <dialog class="sheet" id="sheet" aria-label="Person"></dialog>
   <button class="chat-fab only-mobile" id="openChat">Conversation</button>
+  <script src="/ember.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>
