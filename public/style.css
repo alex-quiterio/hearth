@@ -378,3 +378,16 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 body.resizing .layout { transition: none; }
 body.chat-collapsed .chat-resize { display: none; }
 @media (max-width: 900px) { .chat-resize { display: none; } }
+
+/* thinking: the practice menu */
+.menu { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+.menu-item { display: flex; gap: 10px; align-items: flex-start; text-align: left; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink); }
+.menu-item:hover, .menu-item:focus-visible { border-color: var(--moss); background: var(--surface); }
+.menu-item:first-child { background: var(--moss); border-color: var(--moss); color: var(--surface); }
+.menu-item:first-child .menu-hint { color: var(--surface); opacity: .85; }
+.menu-icon { font-size: 20px; line-height: 1.2; }
+.menu-name { display: block; font-weight: 600; font-size: 14px; }
+.menu-hint { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+.practice-kept { margin-top: 14px; }
+.practice-kept summary { cursor: pointer; font-size: 13px; color: var(--ink-2); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }

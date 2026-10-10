@@ -372,36 +372,48 @@ function soilSection() {
     </div></section>`;
 }
 
+// The emergent-practice modes, as a menu. Each item starts the skill in that mode.
+const PRACTICE_MENU = [
+  { icon: "🪶", name: "A practice for today", hint: "it asks what is here and picks one", run: "/thinking:emergent-practice" },
+  { icon: "🔮", name: "Cast a spell", hint: "Stop Hating, the Authenticity chant, or one of yours", run: "/thinking:emergent-practice cast a spell" },
+  { icon: "✍️", name: "Write a spell", hint: "a few lines that shift the state you are in", run: "/thinking:emergent-practice write a spell" },
+  { icon: "🌬️", name: "Sit", hint: "breath and sensation, from three minutes up", run: "/thinking:emergent-practice sit" },
+  { icon: "🫀", name: "Feel", hint: "a somatic check-in: what is this fighting for?", run: "/thinking:emergent-practice feel" },
+  { icon: "🤝", name: "Woes", hint: "what moved, where I need support, what is coming", run: "/thinking:emergent-practice woes check-in" },
+  { icon: "🌍", name: "Write the future", hint: "a visionary fiction scene, hard and hopeful", run: "/thinking:emergent-practice write the future" },
+  { icon: "🌀", name: "Circle", hint: "a month of one practice with a small group", run: "/thinking:emergent-practice circle" },
+  { icon: "🧺", name: "Inventory", hint: "which practices still fit my values", run: "/thinking:emergent-practice inventory" },
+  { icon: "🐦", name: "Unstick a plan", hint: "the fractal, the connections, one experiment", run: "/thinking:emergent" },
+];
+
 function thinkingSection() {
   const t = S.thinking;
   if (!t) return "";
   const today = new Date().toISOString().slice(0, 10);
-  const ops = `<div class="ops">
-      <button class="tool" data-run="/thinking:emergent-practice">A practice for today</button>
-      <button class="tiny" data-run="/thinking:emergent-practice write a spell">Write a spell</button>
-      <button class="tiny" data-run="/thinking:emergent-practice woes check-in">Woes</button>
-      <button class="tiny" data-run="/thinking:emergent">Unstick a plan</button>
-    </div>`;
-  if (!t.exists) return `<section class="panel thinking"><h2>Thinking</h2>
-    <p class="muted">No practice log yet. Spells, a three-minute sit, a woes check-in: start with one.</p>${ops}</section>`;
+  const menu = `<div class="menu">${PRACTICE_MENU.map((m) =>
+    `<button class="menu-item" data-run="${esc(m.run)}"><span class="menu-icon" aria-hidden="true">${m.icon}</span>
+      <span><span class="menu-name">${esc(m.name)}</span><span class="menu-hint">${esc(m.hint)}</span></span></button>`).join("")}</div>`;
   const exp = t.experiments.map((e) => {
     const due = e.listenOn && e.listenOn <= today;
     return `<li><a href="${obsidianLink(e.name)}">${esc(e.name.replace(/^Emergent /, ""))}</a>
       ${e.listenOn ? `<span class="${due ? "badge" : "muted"}">listen ${due ? "now" : `on ${esc(e.listenOn)}`}</span>` : ""}
       ${due ? `<button class="tiny" data-run="/thinking:emergent listen back on ${esc(e.name)}">Listen back</button>` : ""}</li>`;
   }).join("");
-  return `<section class="panel thinking"><h2>Thinking <span class="sub">emergent strategy, spells and practices</span></h2>
-    ${ops}
-    <div class="inner-cols">
-      <div>
-        ${t.practices ? `<div class="label">Practices held</div><div class="html">${t.practices}</div>` : ""}
-        ${t.recent ? `<div class="label">Lately</div><div class="html">${t.recent}</div>` : ""}
-      </div>
-      <div>
-        ${t.spells.length ? `<div class="label">Spellbook</div><ul>${t.spells.map((n) => `<li><button class="linkish" data-run="/thinking:emergent-practice cast my spell &quot;${esc(n)}&quot;">${esc(n)}</button></li>`).join("")}</ul>` : ""}
-        ${exp ? `<div class="label">Experiments</div><ul>${exp}</ul>` : ""}
-      </div>
-    </div></section>`;
+  const spells = t.spells.map((n) => `<button class="chip" data-run="/thinking:emergent-practice cast my spell &quot;${esc(n)}&quot;">${esc(n)}</button>`).join("");
+  const kept = t.exists
+    ? `<details class="practice-kept"><summary>What I keep${t.spells.length ? ` · ${t.spells.length} spell${t.spells.length > 1 ? "s" : ""}` : ""}${t.experiments.length ? ` · ${t.experiments.length} experiment${t.experiments.length > 1 ? "s" : ""}` : ""}</summary>
+      <div class="inner-cols">
+        <div>
+          ${t.practices ? `<div class="label">Practices held</div><div class="html">${t.practices}</div>` : ""}
+          ${t.recent ? `<div class="label">Lately</div><div class="html">${t.recent}</div>` : ""}
+        </div>
+        <div>
+          ${spells ? `<div class="label">Spellbook</div><div class="chips">${spells}</div>` : ""}
+          ${exp ? `<div class="label">Experiments</div><ul>${exp}</ul>` : ""}
+        </div>
+      </div></details>`
+    : `<p class="muted">Nothing kept yet. The first practice starts the log and the spellbook.</p>`;
+  return `<section class="panel thinking"><h2>Thinking <span class="sub">spells and practices</span></h2>${menu}${kept}</section>`;
 }
 
 function journalSection() {

@@ -260,7 +260,7 @@ export async function hearthConfig(vault: string) {
     pinned: (fm.pinned ?? []) as { name: string; why?: string }[],
     watch: (fm.watch ?? []) as { name: string; why?: string; until?: string }[],
     actions: (fm.actions ?? []) as { label: string; prompt: string; hint?: string }[],
-    panels: (fm.panels ?? ["focus", "weak-points", "rings", "tending", "inner", "thinking"]) as string[],
+    panels: (fm.panels ?? ["focus", "thinking", "weak-points", "rings", "tending", "inner"]) as string[],
     innerVeiled: fm.inner?.veiled ?? true,
     changes: note ? md(sections(note.body).find((s) => /^changes/i.test(s.heading))?.text ?? "") : "",
     changesRaw: note ? (sections(note.body).find((s) => /^changes/i.test(s.heading))?.text ?? "") : "",
