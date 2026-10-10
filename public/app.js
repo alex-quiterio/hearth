@@ -830,7 +830,11 @@ $("#input").addEventListener("keydown", (e) => {
     const res = await fetch("/api/models");
     if (!res.ok) throw new Error(await res.text());
     const list = await res.json();
-    pick.innerHTML = list.map((m) => `<option value="${esc(m.value)}" title="${esc(m.description ?? "")}">${esc(m.displayName)}</option>`).join("");
+    // Aliases (opus, sonnet…) track the newest models; pinned ids like claude-opus-4-7 go under "Older".
+    const opt = (m) => `<option value="${esc(m.value)}" title="${esc(m.description ?? "")}">${esc(m.displayName.replace(/\s*\(recommended\)/i, ""))}</option>`;
+    const older = list.filter((m) => m.value.startsWith("claude-"));
+    pick.innerHTML = list.filter((m) => !older.includes(m)).map(opt).join("") +
+      (older.length ? `<optgroup label="Older">${older.map(opt).join("")}</optgroup>` : "");
   } catch (e) {
     console.warn("models", e);
   }

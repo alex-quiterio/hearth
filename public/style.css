@@ -257,7 +257,16 @@ button.name { cursor: pointer; } button.name:hover { color: var(--clay-ink); }
 .chat-input textarea { width: 100%; resize: vertical; font: inherit; font-size: 14.5px; border: 1px solid var(--line); border-radius: 12px; padding: 9px 11px; background: var(--bg); color: var(--ink); }
 .chat-buttons { display: flex; justify-content: flex-end; gap: 8px; }
 .chat-buttons .attach { margin-right: auto; padding-inline: 10px; }
-#model { min-width: 0; max-width: 11em; font: inherit; font-size: 13px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink); text-overflow: ellipsis; }
+/* The model picker: a pill like the buttons beside it, with a drawn chevron instead of the OS one. */
+#model { appearance: none; -webkit-appearance: none; min-width: 0; max-width: 10.5em; font: inherit; font-size: 13px; line-height: 1.3;
+  padding: 6px 26px 6px 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); cursor: pointer;
+  text-overflow: ellipsis; white-space: nowrap; overflow: hidden;
+  background: var(--surface) no-repeat;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 55%, calc(100% - 11px) 55%; background-size: 4px 4px; }
+#model:hover { border-color: var(--muted); }
+#model:focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
+#model option, #model optgroup { background: var(--surface); color: var(--ink); }
 .attachments { display: flex; flex-wrap: wrap; gap: 6px; }
 .attachments .chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; font-size: 12.5px; padding: 3px 6px 3px 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); overflow-wrap: anywhere; }
 .attachments .chip.loading { opacity: .6; }
