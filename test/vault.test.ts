@@ -57,6 +57,7 @@ describe("hearth config", () => {
     expect(s.config.pinned[0]!.name).toBe("Ana Exemplo");
     expect(s.config.watch[0]!.name).toBe("Marco Silent");
     expect(s.config.actions.map((a) => a.label)).toEqual(["Say hello"]);
+    expect(s.config.now).toEqual([{ what: "the dream of water", why: "still untold", run: "/inner-work:jung-therapist", until: "2026-10-20" }]);
     expect(s.config.changes).toContain("demo config");
   });
 

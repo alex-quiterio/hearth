@@ -44,7 +44,9 @@ pandora vault ──read──▶ hearth (Bun server) ──▶ browser dashboar
   there. A button sends `/kin:tend`; a follow-up resumes the same session. It uses your
   Claude Code login and its usage limits, not an API key.
 - **The dashboard configures itself.** Its layout lives in the note
-  `4 - Archive/kin/Hearth.md`: `pinned`, `watch`, `actions`, `panels`. The kin skills and
+  `4 - Archive/kin/Hearth.md`: `pinned`, `watch`, `now` (the Inner screen's list of what is
+  alive inside), `actions`, `panels`. `/kin:hearth` refreshes all of it from what the skills
+  wrote lately. The kin skills and
   jung-therapist edit that frontmatter when a session changes what matters and log the
   change under `## Changes`. The "Tend the hearth" button asks Claude to reshape it on
   purpose.

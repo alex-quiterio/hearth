@@ -316,6 +316,7 @@ export async function hearthConfig(vault: string) {
     error: fm._error ?? null,
     pinned: (fm.pinned ?? []) as { name: string; why?: string }[],
     watch: (fm.watch ?? []) as { name: string; why?: string; until?: string }[],
+    now: (fm.now ?? []) as { what: string; why?: string; run?: string; until?: string }[],
     actions: (fm.actions ?? []) as { label: string; prompt: string; hint?: string }[],
     panels: (fm.panels ?? ["focus", "thinking", "weak-points", "rings", "tending", "inner"]) as string[],
     innerVeiled: fm.inner?.veiled ?? true,

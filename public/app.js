@@ -546,10 +546,24 @@ function skySection() {
   </section>`;
 }
 
+function nowSection() {
+  const now = S.config.now ?? [];
+  if (!now.length) return `<section class="panel now"><h2>Now</h2>
+    <p class="muted">Nothing named yet. <button class="tiny" data-run="/kin:hearth">Refresh hearth</button> reads what the skills wrote lately and fills this.</p></section>`;
+  return `<section class="panel now"><h2>Now <button class="tiny ghost" data-run="/kin:hearth" title="Read what the skills wrote lately and refresh the dashboard">refresh</button></h2>
+    <div class="now-list">${now.map((n) => {
+      const left = daysUntil(n.until);
+      return `<div class="now-item"><div><strong>${esc(n.what)}</strong>${n.until ? ` <span class="${left != null && left <= 3 ? "badge" : "muted"}">${left != null && left < 0 ? "passed" : left === 0 ? "today" : `until ${esc(day(n.until))}`}</span>` : ""}
+        ${n.why ? `<p class="muted">${esc(n.why)}</p>` : ""}</div>
+        ${n.run ? `<button class="tiny" data-run="${esc(n.run)}">Begin</button>` : ""}</div>`;
+    }).join("")}</div></section>`;
+}
+
 function innerScreen() {
   if (!S) return "";
   return [
     skySection(),
+    nowSection(),
     innerLaunch(),
     soilSection(),
     `<div class="inner-cols">${proprioceptionSection()}${thinkingSection()}</div>`,

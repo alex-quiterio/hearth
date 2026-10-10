@@ -434,3 +434,8 @@ body.chat-collapsed .chat-resize { display: none; }
   .seed-drift { opacity: .6; }
   .breath-word { animation: none; } .breath-word.in { opacity: 1; }
 }
+
+/* the inner screen's Now list */
+.now-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.now-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; background: var(--surface-2); border-radius: 12px; padding: 10px 12px; }
+.now-item p { margin: 4px 0 0; font-size: 13px; }
