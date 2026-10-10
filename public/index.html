@@ -19,7 +19,10 @@
           <p class="today" id="today"></p>
           <div class="rhythm" id="rhythm"></div>
         </div>
-        <div class="tools" id="actions"></div>
+        <div class="tools">
+          <button class="tool menu-open" id="menuOpen" title="Every command (⌘K)" aria-haspopup="dialog">☰ Menu</button>
+          <span id="actions"></span>
+        </div>
         <form id="logoutForm" method="post" action="/logout" hidden></form>
         <div class="powers">
           <button class="power" id="logout" title="Lock Hearth on this browser: the password opens it again" hidden>🔒 Lock</button>
@@ -56,7 +59,7 @@
       </div>
       <div class="history" id="history" hidden></div>
       <div class="chat-log" id="log">
-        <p class="muted hint">Pick an action above, or a person's tend / repair / write, or just write.</p>
+        <p class="muted hint">Open the menu for every command, pick a person's tend / repair / write, or just write.</p>
       </div>
       <form class="chat-input" id="form">
         <div class="attachments" id="attachments" hidden></div>
@@ -73,6 +76,12 @@
   </div>
 
   <dialog class="sheet" id="sheet" aria-label="Person"></dialog>
+  <dialog class="sheet menu-sheet" id="menu" aria-label="Menu">
+    <form method="dialog" class="sheet-close"><button class="ghost" aria-label="Close">✕</button></form>
+    <h2>Menu</h2>
+    <input type="search" id="menuSearch" placeholder="Find a command… (try spell, money, reply)" aria-label="Find a command" autocomplete="off">
+    <div id="menuBody"></div>
+  </dialog>
   <button class="chat-fab only-mobile" id="openChat">Conversation</button>
   <script src="/ember.js"></script>
   <script src="/app.js"></script>

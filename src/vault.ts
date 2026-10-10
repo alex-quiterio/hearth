@@ -87,6 +87,8 @@ export type Person = {
   placeLabel: string;
   note: string;
   ring: string;
+  /** A woe (Working On Excellence): the rhythm after "woe, ", "" if none given; null if not a woe. */
+  woe: string | null;
   lastThread: string | null;
   draftsWaiting: number;
 };
@@ -98,13 +100,17 @@ function parsePerson(line: string, ring: string): Person {
   const name = (link ? link[1]! : head.replace(/\(.*?\)/g, "")).trim().replace(/,.*$/, "").normalize("NFC");
   const placePart = parts[1] ?? "";
   const emoji = Object.keys(PLACES).find((e) => placePart.includes(e));
+  const rest = parts.slice(2);
+  const woeAt = rest.findIndex((p) => /^woe\b/i.test(p.trim()));
+  const woe = woeAt < 0 ? null : rest.splice(woeAt, 1)[0]!.trim().replace(/^woe,?\s*/i, "");
   return {
     name,
     linked: !!link,
     place: emoji ? PLACES[emoji]! : null,
     placeLabel: placePart.trim(),
-    note: parts.slice(2).join(" · ").trim(),
+    note: rest.join(" · ").trim(),
     ring,
+    woe,
     lastThread: null,
     draftsWaiting: 0,
   };
@@ -276,7 +282,8 @@ export async function state(vault: string, today?: string) {
     thinkingState(vault),
   ]);
   const gardenState = await garden(vault, kinPeople(kin), config, today);
-  return { vaultName: VAULT_NAME, config, kin, inner, tending, thinking, garden: gardenState, at: Date.now() };
+  const woes = kinPeople(kin).filter((p) => p.woe != null).map((p) => ({ name: p.name, rhythm: p.woe, place: p.place }));
+  return { vaultName: VAULT_NAME, config, kin, inner, tending, thinking: { ...thinking, woes }, garden: gardenState, at: Date.now() };
 }
 
 export const kinPeople = (kin: Awaited<ReturnType<typeof kinState>>): Person[] =>

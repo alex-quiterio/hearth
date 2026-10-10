@@ -6,6 +6,7 @@ import { chat, answerPermission, stop, listModels } from "./agent";
 import { sessions, transcript, forget } from "./history";
 import { saveAttachment, vaultFile, sweepAttachments, type Attachment } from "./attach";
 import { loadAuth, authed, login, logout, AUTH_FILE } from "./auth";
+import { menu } from "./menu";
 
 const vault = await findVault();
 const PORT = Number(process.env.HEARTH_PORT ?? 4747);
@@ -80,6 +81,7 @@ Bun.serve({
     "/favicon.ico": () => new Response(Bun.file(join(PUBLIC, "favicon.svg")), { headers: { "content-type": "image/svg+xml" } }),
 
     "/api/state": async () => Response.json({ ...(await state(vault)), auth: hasPassword }),
+    "/api/menu": async () => Response.json(await menu()),
 
     "/api/events": (req) => {
       let send: (at: number) => void;

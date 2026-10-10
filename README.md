@@ -24,7 +24,10 @@ pandora vault ──read──▶ hearth (Bun server) ──▶ browser dashboar
 - **The vault is the brain.** Hearth stores nothing. It reads `4 - Archive/kin/` (Kin map,
   Tending log, Own psychology, Own territory) and `4 - Archive/conversations/`, and
   refreshes the page when any of them change.
-- **A thinking panel.** It reads `4 - Archive/practice/` (the `thinking:emergent-practice`
+- **One menu for every command.** ☰ Menu (or ⌘K) lists every buchecha skill, read from the
+  plugin checkout (`HEARTH_PLUGINS_DIR`) and grouped by plugin, with the hearth's own
+  `actions` first and a search box. Only "Tend the hearth" stays in the header.
+- **A practice panel.** It reads `4 - Archive/practice/` (the `thinking:emergent-practice`
   log and spellbook) and the `1 - Rough Notes/Emergent *.md` experiments from
   `thinking:emergent`, sorted by their listen date. Its buttons start a practice, write a
   spell, run a woes check-in or unstick a plan, and an experiment whose date has come gets
@@ -71,6 +74,7 @@ Copy `.env.example` to `.env` (Bun loads it on its own; `.env` is git-ignored).
 | `HEARTH_VAULT` | the Obsidian vault named `pandora`, found in Obsidian's own config |
 | `HEARTH_VAULT_NAME` | `pandora` |
 | `HEARTH_PORT` | `4747` |
+| `HEARTH_PLUGINS_DIR` | `~/code/alex-quiterio/buchecha/plugins`: where the menu reads the skills |
 | `HEARTH_AUTH_FILE` | `~/.config/hearth/auth.json`: the password hash and cookie secret |
 | `ANTHROPIC_API_KEY` | unset: runs on your Claude Code login. Set, every turn bills that API key |
 

@@ -121,8 +121,9 @@ function render() {
     : "";
 
   $("#actions").innerHTML = config.actions
-    .map((a, i) => `<button class="tool ${/hearth/i.test(a.label) ? "gardener" : ""}" data-action="${i}" title="${esc(a.hint ?? a.prompt)}">${esc(a.label)}</button>`)
+    .map((a, i) => (/hearth/i.test(a.label) ? `<button class="tool gardener" data-action="${i}" title="${esc(a.hint ?? a.prompt)}">${esc(a.label)}</button>` : ""))
     .join("");
+  if ($("#menu").open) renderMenu();
 
   const notices = [];
   if (!config.exists) notices.push(`No <code>4 - Archive/kin/Hearth.md</code> yet, so the hearth runs on defaults.`);
@@ -372,49 +373,95 @@ function soilSection() {
     </div></section>`;
 }
 
-// The emergent-practice modes, as a menu. Each item starts the skill in that mode.
-const PRACTICE_MENU = [
-  { icon: "🪶", name: "A practice for today", hint: "it asks what is here and picks one", run: "/thinking:emergent-practice" },
-  { icon: "🔮", name: "Cast a spell", hint: "Stop Hating, the Authenticity chant, or one of yours", run: "/thinking:emergent-practice cast a spell" },
-  { icon: "✍️", name: "Write a spell", hint: "a few lines that shift the state you are in", run: "/thinking:emergent-practice write a spell" },
-  { icon: "🌬️", name: "Sit", hint: "breath and sensation, from three minutes up", run: "/thinking:emergent-practice sit" },
-  { icon: "🫀", name: "Feel", hint: "a somatic check-in: what is this fighting for?", run: "/thinking:emergent-practice feel" },
-  { icon: "🤝", name: "Woes", hint: "what moved, where I need support, what is coming", run: "/thinking:emergent-practice woes check-in" },
-  { icon: "🌍", name: "Write the future", hint: "a visionary fiction scene, hard and hopeful", run: "/thinking:emergent-practice write the future" },
-  { icon: "🌀", name: "Circle", hint: "a month of one practice with a small group", run: "/thinking:emergent-practice circle" },
-  { icon: "🧺", name: "Inventory", hint: "which practices still fit my values", run: "/thinking:emergent-practice inventory" },
-  { icon: "🐦", name: "Unstick a plan", hint: "the fractal, the connections, one experiment", run: "/thinking:emergent" },
+// The emergent-practice modes, shown under that skill in the main menu.
+const PRACTICE_MODES = [
+  ["🔮", "cast", "cast a spell"], ["✍️", "write a spell", "write a spell"], ["🌬️", "sit", "sit"], ["🫀", "feel", "feel"],
+  ["🤝", "woes", "woes check-in"], ["🌍", "the future", "write the future"], ["🌀", "circle", "circle"], ["🧺", "inventory", "inventory"],
 ];
+const SKILL_MODES = { "/thinking:emergent-practice": PRACTICE_MODES };
 
 function thinkingSection() {
   const t = S.thinking;
   if (!t) return "";
   const today = new Date().toISOString().slice(0, 10);
-  const menu = `<div class="menu">${PRACTICE_MENU.map((m) =>
-    `<button class="menu-item" data-run="${esc(m.run)}"><span class="menu-icon" aria-hidden="true">${m.icon}</span>
-      <span><span class="menu-name">${esc(m.name)}</span><span class="menu-hint">${esc(m.hint)}</span></span></button>`).join("")}</div>`;
+  const woes = (t.woes ?? []).map((w) => `<button class="chip" title="${esc(w.rhythm || "woe")}" data-run="/thinking:emergent-practice woes check-in with ${esc(w.name)}">${esc(w.name)}${w.rhythm ? ` <span class="muted">${esc(w.rhythm)}</span>` : ""}</button>`).join("");
+  const spells = t.spells.map((n) => `<button class="chip" data-run="/thinking:emergent-practice cast my spell &quot;${esc(n)}&quot;">${esc(n)}</button>`).join("");
   const exp = t.experiments.map((e) => {
     const due = e.listenOn && e.listenOn <= today;
     return `<li><a href="${obsidianLink(e.name)}">${esc(e.name.replace(/^Emergent /, ""))}</a>
       ${e.listenOn ? `<span class="${due ? "badge" : "muted"}">listen ${due ? "now" : `on ${esc(e.listenOn)}`}</span>` : ""}
       ${due ? `<button class="tiny" data-run="/thinking:emergent listen back on ${esc(e.name)}">Listen back</button>` : ""}</li>`;
   }).join("");
-  const spells = t.spells.map((n) => `<button class="chip" data-run="/thinking:emergent-practice cast my spell &quot;${esc(n)}&quot;">${esc(n)}</button>`).join("");
-  const kept = t.exists
-    ? `<details class="practice-kept"><summary>What I keep${t.spells.length ? ` · ${t.spells.length} spell${t.spells.length > 1 ? "s" : ""}` : ""}${t.experiments.length ? ` · ${t.experiments.length} experiment${t.experiments.length > 1 ? "s" : ""}` : ""}</summary>
-      <div class="inner-cols">
-        <div>
-          ${t.practices ? `<div class="label">Practices held</div><div class="html">${t.practices}</div>` : ""}
-          ${t.recent ? `<div class="label">Lately</div><div class="html">${t.recent}</div>` : ""}
-        </div>
-        <div>
-          ${spells ? `<div class="label">Spellbook</div><div class="chips">${spells}</div>` : ""}
-          ${exp ? `<div class="label">Experiments</div><ul>${exp}</ul>` : ""}
-        </div>
-      </div></details>`
-    : `<p class="muted">Nothing kept yet. The first practice starts the log and the spellbook.</p>`;
-  return `<section class="panel thinking"><h2>Thinking <span class="sub">spells and practices</span></h2>${menu}${kept}</section>`;
+  const start = `<button class="tiny" data-run="/thinking:emergent-practice">A practice for today</button>`;
+  if (!t.exists && !woes) return `<section class="panel thinking"><h2>Practice ${start}</h2>
+    <p class="muted">Nothing kept yet. The first practice starts the log and the spellbook; every mode is in the menu.</p></section>`;
+  return `<section class="panel thinking"><h2>Practice ${start}</h2>
+    <div class="inner-cols">
+      <div>
+        ${t.practices ? `<div class="label">Practices held</div><div class="html">${t.practices}</div>` : ""}
+        ${t.recent ? `<div class="label">Lately</div><div class="html">${t.recent}</div>` : ""}
+      </div>
+      <div>
+        ${woes ? `<div class="label">Woes</div><div class="chips">${woes}</div>` : ""}
+        ${spells ? `<div class="label">Spellbook</div><div class="chips">${spells}</div>` : ""}
+        ${exp ? `<div class="label">Experiments</div><ul>${exp}</ul>` : ""}
+      </div>
+    </div></section>`;
 }
+
+/* ---------- main menu ---------- */
+
+let MENU = [];
+async function loadMenu() {
+  try {
+    const res = await fetch("/api/menu");
+    if (res.ok) MENU = await res.json();
+  } catch {}
+}
+
+function renderMenu() {
+  const q = $("#menuSearch").value.trim().toLowerCase();
+  const hit = (...xs) => !q || xs.some((x) => String(x ?? "").toLowerCase().includes(q));
+  const hearth = (S?.config.actions ?? [])
+    .map((a, i) => ({ a, i }))
+    .filter(({ a }) => hit(a.label, a.hint, a.prompt))
+    .map(({ a, i }) => `<button class="menu-item" data-action="${i}"><span><span class="menu-name">${esc(a.label)}</span><span class="menu-hint">${esc(a.hint ?? "")}</span></span></button>`)
+    .join("");
+  const groups = MENU.map((g) => {
+    const items = g.items.filter((it) => hit(it.name, it.hint, it.command, g.plugin, ...(SKILL_MODES[it.command] ?? []).map((m) => m[2])));
+    if (!items.length) return "";
+    return `<section class="menu-group"><h3>${g.icon} ${esc(g.plugin)}</h3><div class="menu">${items.map((it) => {
+      const modes = SKILL_MODES[it.command];
+      return `<div class="menu-cell"><button class="menu-item" data-run="${esc(it.command)}" title="${esc(it.command)}"><span><span class="menu-name">${esc(it.name)}</span><span class="menu-hint">${esc(it.hint)}</span></span></button>
+        ${modes ? `<div class="chips menu-modes">${modes.map(([icon, label, arg]) => `<button class="chip" data-run="${esc(`${it.command} ${arg}`)}">${icon} ${esc(label)}</button>`).join("")}</div>` : ""}</div>`;
+    }).join("")}</div></section>`;
+  }).join("");
+  $("#menuBody").innerHTML =
+    (hearth ? `<section class="menu-group"><h3>🔥 hearth</h3><div class="menu">${hearth}</div></section>` : "") +
+    (groups || (MENU.length ? "" : `<p class="muted">No buchecha checkout found, so only the hearth's own actions are here.</p>`)) ||
+    `<p class="muted">Nothing matches “${esc(q)}”.</p>`;
+}
+
+async function openMenu() {
+  if (!MENU.length) await loadMenu();
+  $("#menuSearch").value = "";
+  renderMenu();
+  $("#menu").showModal();
+  $("#menuSearch").focus();
+}
+$("#menuOpen").onclick = openMenu;
+$("#menuSearch").addEventListener("input", renderMenu);
+$("#menuSearch").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  $("#menuBody .menu-item")?.click();
+});
+$("#menu").addEventListener("click", (e) => { if (e.target === $("#menu")) $("#menu").close(); });
+document.addEventListener("keydown", (e) => {
+  if (e.key.toLowerCase() !== "k" || !(e.metaKey || e.ctrlKey)) return;
+  e.preventDefault();
+  $("#menu").open ? $("#menu").close() : openMenu();
+});
 
 function journalSection() {
   const t = S.tending;
@@ -490,8 +537,8 @@ document.addEventListener("click", (e) => {
     const inGarden = document.querySelector(`#garden .plant[data-plant="${CSS.escape(name)}"]`);
     inGarden?.classList.add("rippling");
     water(name, card);
-  } else if (t.dataset.action != null) startNew(S.config.actions[+t.dataset.action].prompt);
-  else if (t.dataset.run != null) { if ($("#sheet").open) $("#sheet").close(); startNew(t.dataset.run); }
+  } else if (t.dataset.action != null) { if ($("#menu").open) $("#menu").close(); startNew(S.config.actions[+t.dataset.action].prompt); }
+  else if (t.dataset.run != null) { for (const d of ["#sheet", "#menu"]) if ($(d).open) $(d).close(); startNew(t.dataset.run); }
   else if (t.dataset.sheet != null) openSheet(t.dataset.sheet);
   else if (t.dataset.filter) { placeFilter = t.dataset.filter; render(); }
   else if (t.hasAttribute("data-unveil")) { unveiled = true; render(); }

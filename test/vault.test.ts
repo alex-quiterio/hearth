@@ -89,6 +89,11 @@ describe("thinking", () => {
     expect(s.thinking.spells).toEqual(["Soft hands"]);
   });
 
+  test("woes come from the woe segment in the kin map, kept out of the note", () => {
+    expect(s.thinking.woes).toEqual([{ name: "Ana Exemplo", rhythm: "weekly call", place: "lisbon" }]);
+    expect(person("Ana Exemplo").note).toBe("old friend, call slipping.");
+  });
+
   test("emergent experiments sort by their listen date", () => {
     expect(s.thinking.experiments.map((e) => [e.name, e.listenOn])).toEqual([
       ["Emergent garden club", "2026-10-12"],

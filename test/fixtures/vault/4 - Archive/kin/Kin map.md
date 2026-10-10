@@ -8,7 +8,7 @@ updated: 2026-10-01
 
 ## 🫀 Core (would come at 3am)
 
-- [[Ana Exemplo]] · 🌊 Lisbon · old friend, call slipping.
+- [[Ana Exemplo]] · 🌊 Lisbon · woe, weekly call · old friend, call slipping.
 - Rui Teste, his brother · 🌳 near the land · sees him on Sundays.
 
 ## 🤝 Close (sees him, knows what he is carrying)
