@@ -1,4 +1,4 @@
-import { query, type CanUseTool, type PermissionResult } from "@anthropic-ai/claude-agent-sdk";
+import { query, type CanUseTool, type ModelInfo, type PermissionResult, type SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { resolve, sep } from "node:path";
 
 // One Claude Code session per conversation, resumed turn by turn. It loads the user's
@@ -113,7 +113,29 @@ const append = (vault: string) => `You are running inside Hearth, Alex's local d
 
 The vault is at ${vault}. To write a note, use Edit or Write on its file there, or one plain \`obsidian\` command; both run without asking Alex. Do not wrap vault writes in python or shell scripts: every one of those stops him for approval.`;
 
-export async function* chat(message: string, vault: string, sessionId?: string): AsyncGenerator<ChatEvent> {
+let models: Promise<ModelInfo[]> | null = null;
+
+/** The models Claude Code offers this account, asked once from an idle session that never sends a turn. */
+export function listModels(): Promise<ModelInfo[]> {
+  models ??= (async () => {
+    const abort = new AbortController();
+    const idle = (async function* (): AsyncGenerator<SDKUserMessage> {
+      await new Promise((r) => abort.signal.addEventListener("abort", r));
+    })();
+    const q = query({ prompt: idle, options: { cwd: process.cwd(), abortController: abort } });
+    try {
+      return await q.supportedModels();
+    } finally {
+      abort.abort();
+    }
+  })().catch((e) => {
+    models = null;
+    throw e;
+  });
+  return models;
+}
+
+export async function* chat(message: string, vault: string, sessionId?: string, model?: string): AsyncGenerator<ChatEvent> {
   running?.abort();
   const abort = new AbortController();
   running = abort;
@@ -139,6 +161,7 @@ export async function* chat(message: string, vault: string, sessionId?: string):
     options: {
       cwd: process.cwd(),
       resume: sessionId,
+      model,
       abortController: abort,
       includePartialMessages: true,
       permissionMode: "default",

@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { watch } from "node:fs";
 import { findVault, state, lastChange, kinState, kinPeople, PATHS, VAULT_NAME } from "./vault";
 import { waterPlant } from "./garden";
-import { chat, answerPermission, stop } from "./agent";
+import { chat, answerPermission, stop, listModels } from "./agent";
 import { sessions, transcript, forget } from "./history";
 import { saveAttachment, vaultFile, sweepAttachments, type Attachment } from "./attach";
 
@@ -68,15 +68,23 @@ Bun.serve({
       return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } });
     },
 
+    "/api/models": async () => {
+      try {
+        return Response.json(await listModels());
+      } catch (e) {
+        return Response.json({ error: (e as Error).message }, { status: 502 });
+      }
+    },
+
     "/api/chat": {
       POST: async (req) => {
-        const { message, sessionId } = (await req.json()) as { message?: string; sessionId?: string };
+        const { message, sessionId, model } = (await req.json()) as { message?: string; sessionId?: string; model?: string };
         if (!message?.trim()) return Response.json({ error: "empty message" }, { status: 400 });
         const enc = new TextEncoder();
         const stream = new ReadableStream({
           async start(c) {
             try {
-              for await (const e of chat(message, vault, sessionId)) c.enqueue(enc.encode(sse(e)));
+              for await (const e of chat(message, vault, sessionId, model && model !== "default" ? model : undefined)) c.enqueue(enc.encode(sse(e)));
             } catch (e) {
               c.enqueue(enc.encode(sse({ type: "error", message: (e as Error).message })));
             }

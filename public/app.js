@@ -735,7 +735,7 @@ async function send(message) {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(sessionId ? { message, sessionId } : { message }),
+      body: JSON.stringify({ message, ...(sessionId && { sessionId }), ...($("#model").value && { model: $("#model").value }) }),
     });
     if (!res.ok || !res.body) throw new Error(`${res.status} ${await res.text()}`);
     const reader = res.body.getReader();
@@ -797,7 +797,7 @@ function handle(ev) {
     }
     case "done":
       if (ev.isError) append("msg error", esc(ev.result || "The turn ended with an error."));
-      append("cost", ev.costUsd != null ? `$${Number(ev.costUsd).toFixed(3)}` : "done");
+      append("stamp", new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
       break;
     case "error": append("msg error", esc(ev.message)); break;
   }
@@ -813,6 +813,23 @@ $("#form").addEventListener("submit", async (e) => {
 $("#input").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#form").requestSubmit(); }
 });
+// The model picker: Claude Code's own list, remembered per browser, applied from the next turn on.
+(async () => {
+  const pick = $("#model");
+  pick.onchange = () => store.set("hearth.model", pick.value);
+  try {
+    const res = await fetch("/api/models");
+    if (!res.ok) throw new Error(await res.text());
+    const list = await res.json();
+    pick.innerHTML = list.map((m) => `<option value="${esc(m.value)}" title="${esc(m.description ?? "")}">${esc(m.displayName)}</option>`).join("");
+  } catch (e) {
+    console.warn("models", e);
+  }
+  // Opus until a choice is saved.
+  const saved = store.get("hearth.model") ?? "opus";
+  if ([...pick.options].some((o) => o.value === saved)) pick.value = saved;
+})();
+
 $("#stop").onclick = () => (stopAsked = true, fetch("/api/stop", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }));
 $("#newChat").onclick = () => {
   if (running) return;
