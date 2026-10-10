@@ -256,6 +256,8 @@ export async function thinkingState(vault: string, recent = 3) {
     recent: md(entries.slice(0, recent).map((e) => e.trim()).join("\n")),
     spells: spells ? sections(spells.body).filter((s) => s.heading).map((s) => s.heading) : [],
     experiments,
+    // The day each log entry was practised: its first date.
+    days: [...new Set(entries.map((e) => e.match(/\d{4}-\d{2}-\d{2}/)?.[0]).filter((d): d is string => !!d))],
   };
 }
 
@@ -298,7 +300,9 @@ export async function innerScreenState(vault: string) {
   } catch {}
 
   return {
-    proprioception: log ? { weekly: md(weekly), moments: moments.slice(0, 3), count: moments.length } : null,
+    proprioception: log
+      ? { weekly: md(weekly), moments: moments.slice(0, 3), count: moments.length, days: [...new Set(moments.map((m) => m.date))] }
+      : null,
     coordination: coordination && coordination.sections.length ? coordination : null,
     notes: notes.slice(0, 8),
   };

@@ -463,9 +463,92 @@ function notesSection() {
     `<li><a href="${obsidianLink(x.name)}">${esc(x.name)}</a> <span class="muted">${esc(new Date(x.mtime).toISOString().slice(0, 10))}</span></li>`).join("")}</ul></section>`;
 }
 
+/* ---------- the inner sky ---------- */
+
+// Moon age in days since a known new moon (2000-01-06 18:14 UTC), synodic month 29.53 days.
+const SYNODIC = 29.530588;
+function moonAge(date) {
+  const age = ((date.getTime() - Date.UTC(2000, 0, 6, 18, 14)) / 864e5) % SYNODIC;
+  return age < 0 ? age + SYNODIC : age;
+}
+function moonName(age) {
+  const names = ["new moon", "waxing crescent", "first quarter", "waxing gibbous", "full moon", "waning gibbous", "last quarter", "waning crescent", "new moon"];
+  return names[Math.min(8, Math.floor((age / SYNODIC) * 8 + 0.5))];
+}
+function moonSvg(cx, cy, r, age) {
+  const k = Math.cos((2 * Math.PI * age) / SYNODIC); // 1 new, -1 full
+  const rx = (r * Math.abs(k)).toFixed(2);
+  const waxing = age < SYNODIC / 2;
+  const lit = (1 - k) / 2;
+  const [s1, s2] = waxing ? [1, k > 0 ? 0 : 1] : [0, k > 0 ? 1 : 0];
+  const d = `M${cx} ${cy - r} A${r} ${r} 0 0 ${s1} ${cx} ${cy + r} A${rx} ${r} 0 0 ${s2} ${cx} ${cy - r}Z`;
+  return `<g class="moon"><circle class="moon-dark" cx="${cx}" cy="${cy}" r="${r}"/>${lit > 0.02 ? `<path class="moon-lit" d="${d}"/>` : ""}</g>`;
+}
+
+function skySvg() {
+  const today = G.today;
+  const lit = new Set([...(S.thinking?.days ?? []), ...(S.innerScreen?.proprioception?.days ?? [])]);
+  const days = Array.from({ length: 28 }, (_, i) => new Date(Date.parse(today) - (27 - i) * 864e5).toISOString().slice(0, 10));
+  const [cx, cy, rx, ry] = [400, 236, 318, 168];
+  const stars = days.map((d, i) => {
+    const a = Math.PI + (i / 27) * Math.PI * 1.9 - 0.15; // from the left, over the top, round to today
+    const x = (cx + rx * Math.cos(a)).toFixed(1), y = (cy + ry * Math.sin(a)).toFixed(1);
+    const on = lit.has(d), now = d === today;
+    const size = now ? 9 : on ? 7 : 2.6;
+    const star = on || now
+      ? `<path class="star ${on ? "on" : ""}" style="animation-delay:${(i % 7) * 0.6}s" d="M0 ${-size} Q1.4 -1.4 ${size} 0 Q1.4 1.4 0 ${size} Q-1.4 1.4 ${-size} 0 Q-1.4 -1.4 0 ${-size}Z"/>`
+      : `<circle class="star-off" r="${size}"/>`;
+    return `<g transform="translate(${x} ${y})"><title>${esc(d)}${on ? " · practised" : ""}${now ? " · today" : ""}</title>${now ? `<circle class="today-ring" r="14"/>` : ""}${star}</g>`;
+  }).join("");
+  const spells = (S.thinking?.spells ?? []).slice(0, 7);
+  const seeds = spells.map((n, i) => {
+    const x = 400 + (i - (spells.length - 1) / 2) * 70 + (i % 2 ? 14 : -14);
+    return `<g class="seed-drift" style="animation-duration:${16 + (i % 3) * 3}s;animation-delay:${-i * 4.3}s" transform="translate(${x.toFixed(0)} 360)"><title>${esc(n)}</title>
+      <line class="seed-stem" x1="0" y1="0" x2="0" y2="-14"/>${Array.from({ length: 9 }, (_, j) => { const a = -Math.PI / 2 + (j - 4) * 0.33; return `<line class="seed-hair" x1="0" y1="-14" x2="${(Math.cos(a) * 9).toFixed(1)}" y2="${(-14 + Math.sin(a) * 9).toFixed(1)}"/>`; }).join("")}
+      <circle class="seed-head" cy="1" r="1.8"/></g>`;
+  }).join("");
+  const age = moonAge(new Date(today + "T21:00"));
+  return `<svg viewBox="0 0 800 440" role="img" aria-label="Inner sky: a breathing candle, the last 28 days of practice as stars, tonight's moon">
+    <defs><radialGradient id="candleGlow"><stop offset="0" stop-color="var(--amber)" stop-opacity=".45"/><stop offset="1" stop-color="var(--amber)" stop-opacity="0"/></radialGradient></defs>
+    ${moonSvg(704, 62, 24, age)}
+    ${stars}
+    <circle class="glow" cx="400" cy="270" r="120" fill="url(#candleGlow)"/>
+    <g class="breath" transform="translate(400 262)"><circle class="halo" r="46"/><circle class="halo halo-2" r="46"/></g>
+    ${seeds}
+    <g class="candle" transform="translate(400 300)" aria-hidden="true">
+      <ellipse class="stone" cx="0" cy="34" rx="34" ry="7"/>
+      <rect class="wax" x="-11" y="-6" width="22" height="40" rx="3"/>
+      <line class="wick" x1="0" y1="-6" x2="0" y2="-11"/>
+      <g transform="translate(0 -9) scale(.7)">
+        <path class="flame f1" d="M0 4 C -18 -4, -16 -26, -2 -44 C -2 -30, 10 -28, 8 -14 C 14 -20, 16 -10, 16 -4 C 14 2, 8 4, 0 4Z"/>
+        <path class="flame f2" d="M0 4 C -10 0, -10 -16, 0 -28 C 2 -18, 9 -14, 8 -4 C 6 2, 3 4, 0 4Z"/>
+        <path class="flame f3" d="M0 4 C -5 2, -5 -6, 0 -14 C 2 -8, 5 -5, 4 0 C 3 3, 1 4, 0 4Z"/>
+      </g>
+    </g>
+    <text class="breath-word in" x="400" y="372" text-anchor="middle">breathe in</text>
+    <text class="breath-word out" x="400" y="372" text-anchor="middle">breathe out</text>
+  </svg>`;
+}
+
+function skySection() {
+  if (!G) return "";
+  const lit = new Set([...(S.thinking?.days ?? []), ...(S.innerScreen?.proprioception?.days ?? [])]);
+  const since = Date.parse(G.today) - 27 * 864e5;
+  const n = [...lit].filter((d) => Date.parse(d) >= since && Date.parse(d) <= Date.parse(G.today)).length;
+  const age = moonAge(new Date(G.today + "T21:00"));
+  const pct = Math.round(((1 - Math.cos((2 * Math.PI * age) / SYNODIC)) / 2) * 100);
+  const spells = S.thinking?.spells?.length ?? 0;
+  return `<section class="garden-wrap sky-wrap" aria-label="Inner sky">
+    <h2 class="map-title">Inner sky</h2>
+    <div class="garden sky">${skySvg()}</div>
+    <div class="legend"><span>✦ practised on ${n} of the last 28 days</span><span>☾ ${esc(moonName(age))}, ${pct}% lit</span>${spells ? `<span>🌬️ ${spells} spell${spells > 1 ? "s" : ""} adrift</span>` : ""}<span class="muted">breathe with the halo: in for four, out for six</span></div>
+  </section>`;
+}
+
 function innerScreen() {
   if (!S) return "";
   return [
+    skySection(),
     innerLaunch(),
     soilSection(),
     `<div class="inner-cols">${proprioceptionSection()}${thinkingSection()}</div>`,

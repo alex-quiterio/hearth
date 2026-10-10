@@ -403,3 +403,34 @@ body.chat-collapsed .chat-resize { display: none; }
 .inner-launch .menu-icon { font-size: 16px; }
 .notes { margin: 0; padding-left: 18px; }
 .notes li { margin: 4px 0; }
+
+/* the inner sky */
+.sky-wrap { margin-top: 4px; }
+.sky { max-width: 760px; }
+.moon-dark { fill: var(--surface-2); stroke: var(--line); stroke-width: 1.2; }
+.moon-lit { fill: color-mix(in srgb, var(--amber) 30%, var(--surface)); }
+.moon { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--amber) 35%, transparent)); }
+.star-off { fill: var(--muted); opacity: .35; }
+.star { fill: var(--muted); opacity: .6; }
+.star.on { fill: var(--amber); opacity: 1; transform-box: fill-box; transform-origin: center; animation: twinkle 4.2s ease-in-out infinite; }
+.today-ring { fill: none; stroke: var(--clay); stroke-width: 1.2; stroke-dasharray: 2 4; opacity: .7; }
+@keyframes twinkle { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .55; transform: scale(.78); } }
+.halo { fill: none; stroke: var(--amber); stroke-width: 1.6; opacity: .5; transform-box: fill-box; transform-origin: center; animation: breathe 10s ease-in-out infinite; }
+.halo-2 { stroke-width: 1; opacity: .25; animation-delay: -.6s; }
+@keyframes breathe { 0% { transform: scale(.7); } 40% { transform: scale(1.55); } 48% { transform: scale(1.55); } 100% { transform: scale(.7); } }
+.breath-word { font: 500 13px Inter, sans-serif; letter-spacing: .14em; text-transform: uppercase; fill: var(--muted); opacity: 0; animation: 10s linear infinite; }
+.breath-word.in { animation-name: word-in; } .breath-word.out { animation-name: word-out; }
+@keyframes word-in { 0%, 38% { opacity: 1; } 44%, 100% { opacity: 0; } }
+@keyframes word-out { 0%, 42% { opacity: 0; } 48%, 94% { opacity: 1; } 100% { opacity: 0; } }
+.candle .wax { fill: color-mix(in srgb, #f6ead2 88%, var(--amber)); stroke: color-mix(in srgb, #f6ead2 70%, var(--amber)); }
+.candle .wick { stroke: var(--ink-2); stroke-width: 1.4; stroke-linecap: round; }
+.candle .stone { fill: #9d968a; opacity: .5; }
+.seed-drift { animation: drift 18s linear infinite; opacity: 0; }
+.seed-drift .seed-stem, .seed-drift .seed-hair { stroke: var(--ink-2); stroke-width: .8; stroke-linecap: round; }
+.seed-drift .seed-head { fill: var(--ink-2); }
+@keyframes drift { 0% { opacity: 0; translate: 0 0; rotate: 0deg; } 10% { opacity: .75; } 50% { translate: 18px -150px; rotate: 8deg; } 85% { opacity: .5; } 100% { opacity: 0; translate: -10px -300px; rotate: -6deg; } }
+@media (prefers-reduced-motion: reduce) {
+  .star.on, .halo, .seed-drift { animation: none; }
+  .seed-drift { opacity: .6; }
+  .breath-word { animation: none; } .breath-word.in { opacity: 1; }
+}

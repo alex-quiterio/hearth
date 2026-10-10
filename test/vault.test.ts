@@ -87,6 +87,7 @@ describe("thinking", () => {
     expect(s.thinking.recent).toContain("the jaw letting go");
     expect(s.thinking.recent).not.toContain("Sit, 3 min");
     expect(s.thinking.spells).toEqual(["Soft hands"]);
+    expect(s.thinking.days).toEqual(["2026-10-09", "2026-10-08", "2026-10-07", "2026-10-06"]);
   });
 
   test("woes come from the woe segment in the kin map, kept out of the note", () => {
@@ -103,7 +104,7 @@ describe("thinking", () => {
 
   test("no practice notes means an empty panel, not an error", async () => {
     const empty = await state(join(import.meta.dir, "fixtures/nowhere"));
-    expect(empty.thinking).toMatchObject({ exists: false, recent: "", spells: [], experiments: [] });
+    expect(empty.thinking).toMatchObject({ exists: false, recent: "", spells: [], experiments: [], days: [] });
     expect(empty.config.panels).toContain("thinking");
   });
 });
@@ -117,6 +118,7 @@ describe("inner screen", () => {
       ["2026-10-02", "the meeting ran long"],
     ]);
     expect(p.weekly).toContain("the body registers first");
+    expect(p.days).toEqual(["2026-10-09", "2026-10-02"]);
   });
 
   test("the coordination partner note and the thinking outputs in Rough Notes", () => {
