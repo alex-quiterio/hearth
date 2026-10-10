@@ -14,6 +14,10 @@
     .login form { display: grid; gap: 10px; margin-top: 20px; }
     .login input { font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
     .login button { font: inherit; padding: 10px; border-radius: 10px; border: 0; background: var(--clay); color: #fff; cursor: pointer; }
+    .login .pw { position: relative; display: grid; }
+    .login .pw input { padding-right: 64px; }
+    .login .peek { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); padding: 4px 10px; font-size: 13px; background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 8px; }
+    .login .peek:hover { color: var(--ink); }
     .login .note { min-height: 1.4em; color: var(--clay); font-size: 14px; }
   </style>
 </head>
@@ -24,12 +28,25 @@
     <!-- A fixed username so password managers save and fill this login. -->
     <form method="post" action="/login">
       <input type="text" name="username" value="hearth" autocomplete="username" hidden>
-      <input type="password" name="password" autocomplete="current-password" placeholder="Password" aria-label="Password" required autofocus>
+      <div class="pw">
+        <input type="password" name="password" id="password" autocomplete="current-password" placeholder="Password" aria-label="Password" required autofocus>
+        <button type="button" class="peek" id="peek" aria-pressed="false" aria-controls="password">Show</button>
+      </div>
       <button type="submit">Come in</button>
       <p class="note" id="note"></p>
     </form>
   </main>
   <script>
+    const pw = document.getElementById("password"), peek = document.getElementById("peek");
+    peek.onclick = () => {
+      const show = pw.type === "password";
+      pw.type = show ? "text" : "password";
+      peek.textContent = show ? "Hide" : "Show";
+      peek.setAttribute("aria-pressed", String(show));
+      pw.focus();
+    };
+    // Hide it again on submit, so the browser saves it as a password and nothing lingers on screen.
+    document.querySelector("form").addEventListener("submit", () => (pw.type = "password"));
     const q = location.search;
     document.getElementById("note").textContent =
       q.includes("wrong") ? "Not that one." : q.includes("wait") ? "Too many tries. Wait a minute." : "";
