@@ -14,7 +14,7 @@ const PUBLIC = join(import.meta.dir, "../public");
 // Vault change fan-out: one watcher per folder, debounced, broadcast to every open tab.
 const listeners = new Set<(at: number) => void>();
 let debounce: Timer | null = null;
-for (const rel of [PATHS.kinDir, PATHS.conversations]) {
+for (const rel of [PATHS.kinDir, PATHS.conversations, PATHS.practiceDir]) {
   try {
     watch(join(vault, rel), () => {
       if (debounce) clearTimeout(debounce);

@@ -26,6 +26,10 @@ export const PATHS = {
   psychology: "4 - Archive/kin/Own psychology.md",
   territory: "4 - Archive/kin/Own territory.md",
   conversations: "4 - Archive/conversations",
+  practiceDir: "4 - Archive/practice",
+  practiceLog: "4 - Archive/practice/Emergent practice.md",
+  spells: "4 - Archive/practice/Spells.md",
+  roughNotes: "1 - Rough Notes",
 };
 
 type Note = { frontmatter: Record<string, any>; body: string; mtime: number } | null;
@@ -210,6 +214,43 @@ export async function tendingState(vault: string) {
   return { mtime: note.mtime, latest: blocks.slice(-2).map((s) => ({ heading: s.heading, html: md(s.text) })) };
 }
 
+/** The thinking panel: the emergent-practice log and spellbook, and open emergent experiments. */
+export async function thinkingState(vault: string, recent = 3) {
+  const [log, spells] = await Promise.all([readNote(vault, PATHS.practiceLog), readNote(vault, PATHS.spells)]);
+  const logSections = log ? sections(log.body) : [];
+  const practices = logSections.find((s) => /^practices/i.test(s.heading))?.text ?? "";
+  // Log entries are newest first: either `### ` blocks or top-level list items.
+  const logText = logSections.find((s) => /^log/i.test(s.heading))?.text ?? "";
+  const entries = /^### /m.test(logText)
+    ? logText.split(/^(?=### )/m).filter((b) => b.trim().startsWith("###"))
+    : logText.split(/\n(?=- )/).filter((b) => b.trim().startsWith("- "));
+
+  let experiments: { name: string; listenOn: string | null; mtime: number }[] = [];
+  try {
+    const dir = join(vault, PATHS.roughNotes);
+    const files = (await readdir(dir)).filter((f) => /^Emergent .+\.md$/.test(f));
+    experiments = await Promise.all(
+      files.map(async (f) => {
+        const text = await Bun.file(join(dir, f)).text();
+        return {
+          name: f.replace(/\.md$/, ""),
+          listenOn: text.match(/Listen[^\n]*?\b(\d{4}-\d{2}-\d{2})\b/i)?.[1] ?? null,
+          mtime: (await stat(join(dir, f))).mtimeMs,
+        };
+      }),
+    );
+    experiments.sort((a, b) => (a.listenOn ?? "9999").localeCompare(b.listenOn ?? "9999") || b.mtime - a.mtime);
+  } catch {}
+
+  return {
+    exists: !!log || !!spells || experiments.length > 0,
+    practices: md(practices),
+    recent: md(entries.slice(0, recent).map((e) => e.trim()).join("\n")),
+    spells: spells ? sections(spells.body).filter((s) => s.heading).map((s) => s.heading) : [],
+    experiments,
+  };
+}
+
 export async function hearthConfig(vault: string) {
   const note = await readNote(vault, PATHS.hearth);
   const fm = note?.frontmatter ?? {};
@@ -219,7 +260,7 @@ export async function hearthConfig(vault: string) {
     pinned: (fm.pinned ?? []) as { name: string; why?: string }[],
     watch: (fm.watch ?? []) as { name: string; why?: string; until?: string }[],
     actions: (fm.actions ?? []) as { label: string; prompt: string; hint?: string }[],
-    panels: (fm.panels ?? ["focus", "weak-points", "rings", "tending", "inner"]) as string[],
+    panels: (fm.panels ?? ["focus", "weak-points", "rings", "tending", "inner", "thinking"]) as string[],
     innerVeiled: fm.inner?.veiled ?? true,
     changes: note ? md(sections(note.body).find((s) => /^changes/i.test(s.heading))?.text ?? "") : "",
     changesRaw: note ? (sections(note.body).find((s) => /^changes/i.test(s.heading))?.text ?? "") : "",
@@ -227,14 +268,15 @@ export async function hearthConfig(vault: string) {
 }
 
 export async function state(vault: string, today?: string) {
-  const [config, kin, inner, tending] = await Promise.all([
+  const [config, kin, inner, tending, thinking] = await Promise.all([
     hearthConfig(vault),
     kinState(vault),
     innerState(vault),
     tendingState(vault),
+    thinkingState(vault),
   ]);
   const gardenState = await garden(vault, kinPeople(kin), config, today);
-  return { vaultName: VAULT_NAME, config, kin, inner, tending, garden: gardenState, at: Date.now() };
+  return { vaultName: VAULT_NAME, config, kin, inner, tending, thinking, garden: gardenState, at: Date.now() };
 }
 
 export const kinPeople = (kin: Awaited<ReturnType<typeof kinState>>): Person[] =>
@@ -252,7 +294,7 @@ export function md(src: string): string {
 
 export async function lastChange(vault: string): Promise<number> {
   let latest = 0;
-  for (const rel of [PATHS.kinDir, PATHS.conversations]) {
+  for (const rel of [PATHS.kinDir, PATHS.conversations, PATHS.practiceDir]) {
     try {
       const dir = join(vault, rel);
       for (const f of await readdir(dir)) latest = Math.max(latest, (await stat(join(dir, f))).mtimeMs);

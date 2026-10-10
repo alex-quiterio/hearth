@@ -24,6 +24,11 @@ pandora vault ──read──▶ hearth (Bun server) ──▶ browser dashboar
 - **The vault is the brain.** Hearth stores nothing. It reads `4 - Archive/kin/` (Kin map,
   Tending log, Own psychology, Own territory) and `4 - Archive/conversations/`, and
   refreshes the page when any of them change.
+- **A thinking panel.** It reads `4 - Archive/practice/` (the `thinking:emergent-practice`
+  log and spellbook) and the `1 - Rough Notes/Emergent *.md` experiments from
+  `thinking:emergent`, sorted by their listen date. Its buttons start a practice, write a
+  spell, run a woes check-in or unstick a plan, and an experiment whose date has come gets
+  a Listen back button.
 - **Skills run as they do in the terminal.** The chat pane starts a Claude Code session
   through the Agent SDK with your user settings, so every installed buchecha plugin is
   there. A button sends `/kin:tend`; a follow-up resumes the same session. It uses your

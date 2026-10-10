@@ -11,7 +11,7 @@ actions:
   - label: Say hello
     prompt: Say hello in one short line. Do not use any tools.
     hint: a cheap test turn
-panels: [focus, weak-points, rings, tending, inner]
+panels: [focus, weak-points, rings, tending, inner, thinking]
 inner:
   veiled: true
 ---

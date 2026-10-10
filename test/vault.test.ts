@@ -79,6 +79,30 @@ describe("inner work and tending", () => {
   });
 });
 
+describe("thinking", () => {
+  test("reads the practices held, the latest log entries and the spellbook", () => {
+    expect(s.thinking.exists).toBe(true);
+    expect(s.thinking.practices).toContain("a sit, 5 minutes");
+    expect(s.thinking.recent.match(/<li>/g)).toHaveLength(3);
+    expect(s.thinking.recent).toContain("the jaw letting go");
+    expect(s.thinking.recent).not.toContain("Sit, 3 min");
+    expect(s.thinking.spells).toEqual(["Soft hands"]);
+  });
+
+  test("emergent experiments sort by their listen date", () => {
+    expect(s.thinking.experiments.map((e) => [e.name, e.listenOn])).toEqual([
+      ["Emergent garden club", "2026-10-12"],
+      ["Emergent shared meal", "2026-10-20"],
+    ]);
+  });
+
+  test("no practice notes means an empty panel, not an error", async () => {
+    const empty = await state(join(import.meta.dir, "fixtures/nowhere"));
+    expect(empty.thinking).toMatchObject({ exists: false, recent: "", spells: [], experiments: [] });
+    expect(empty.config.panels).toContain("thinking");
+  });
+});
+
 test("wiki links open in Obsidian", () => {
   expect(md("see [[Ana Exemplo]]")).toContain('href="obsidian://open?vault=pandora&amp;file=Ana%20Exemplo"');
 });
