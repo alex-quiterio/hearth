@@ -18,6 +18,10 @@
           <h1>Hearth</h1>
           <p class="today" id="today"></p>
           <div class="rhythm" id="rhythm"></div>
+          <nav class="screens" aria-label="Screens">
+            <a href="#kin" data-screen="kin">🫂 Kin</a>
+            <a href="#inner" data-screen="inner">🕯️ Inner</a>
+          </nav>
         </div>
         <div class="tools">
           <button class="tool menu-open" id="menuOpen" title="Every command (⌘K)" aria-haspopup="dialog">☰ Menu</button>
@@ -31,6 +35,7 @@
       </header>
       <div id="notices"></div>
 
+      <div id="kinScreen">
       <section class="garden-wrap" aria-label="Kin map">
         <h2 class="map-title">Kin map</h2>
         <div class="garden" id="garden"><p class="muted">Lighting the fire…</p></div>
@@ -39,6 +44,9 @@
       </section>
 
       <div id="sections"></div>
+      </div>
+
+      <div id="innerScreen" hidden></div>
     </main>
 
     <aside class="chat" id="chat" aria-label="Conversation">

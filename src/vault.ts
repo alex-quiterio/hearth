@@ -26,6 +26,8 @@ export const PATHS = {
   psychology: "4 - Archive/kin/Own psychology.md",
   territory: "4 - Archive/kin/Own territory.md",
   conversations: "4 - Archive/conversations",
+  proprioception: "4 - Archive/kin/Proprioception log.md",
+  coordination: "4 - Archive/projects/Coordination partner.md",
   practiceDir: "4 - Archive/practice",
   practiceLog: "4 - Archive/practice/Emergent practice.md",
   spells: "4 - Archive/practice/Spells.md",
@@ -257,6 +259,51 @@ export async function thinkingState(vault: string, recent = 3) {
   };
 }
 
+/** The Inner screen's own reads: proprioception moments, the coordination partner, thinking outputs. */
+export async function innerScreenState(vault: string) {
+  const [log, coordination] = await Promise.all([
+    readNote(vault, PATHS.proprioception),
+    pick(vault, PATHS.coordination, [/./]),
+  ]);
+  const logSections = log ? sections(log.body) : [];
+  const weekly = logSections.find((s) => /^weekly/i.test(s.heading))?.text ?? "";
+  // Moments are `### YYYY-MM-DD · <moment>` blocks; the template's own placeholder has no date.
+  const momentsText = logSections.find((s) => /^moments/i.test(s.heading))?.text ?? "";
+  const moments = momentsText
+    .split(/^(?=### )/m)
+    .map((b) => b.trim())
+    .filter((b) => /^### \d{4}-\d{2}-\d{2}/.test(b))
+    .map((b) => {
+      const [head, ...rest] = b.split("\n");
+      const [, date, title] = head!.match(/^### (\d{4}-\d{2}-\d{2})\s*·?\s*(.*)$/)!;
+      return { date: date!, title: title!.trim(), html: md(rest.join("\n").trim()) };
+    })
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  // What the thinking skills leave in Rough Notes, newest first.
+  const OUTPUTS = /^(Emergent|Visionary fiction|Work rhythm|Climate geopolitics brief|Crossing) .*\.md$/;
+  let notes: { name: string; kind: string; mtime: number }[] = [];
+  try {
+    const dir = join(vault, PATHS.roughNotes);
+    notes = await Promise.all(
+      (await readdir(dir))
+        .filter((f) => OUTPUTS.test(f))
+        .map(async (f) => ({
+          name: f.replace(/\.md$/, ""),
+          kind: f.match(OUTPUTS)![1]!,
+          mtime: (await stat(join(dir, f))).mtimeMs,
+        })),
+    );
+    notes.sort((a, b) => b.mtime - a.mtime);
+  } catch {}
+
+  return {
+    proprioception: log ? { weekly: md(weekly), moments: moments.slice(0, 3), count: moments.length } : null,
+    coordination: coordination && coordination.sections.length ? coordination : null,
+    notes: notes.slice(0, 8),
+  };
+}
+
 export async function hearthConfig(vault: string) {
   const note = await readNote(vault, PATHS.hearth);
   const fm = note?.frontmatter ?? {};
@@ -274,16 +321,17 @@ export async function hearthConfig(vault: string) {
 }
 
 export async function state(vault: string, today?: string) {
-  const [config, kin, inner, tending, thinking] = await Promise.all([
+  const [config, kin, inner, tending, thinking, innerScreen] = await Promise.all([
     hearthConfig(vault),
     kinState(vault),
     innerState(vault),
     tendingState(vault),
     thinkingState(vault),
+    innerScreenState(vault),
   ]);
   const gardenState = await garden(vault, kinPeople(kin), config, today);
   const woes = kinPeople(kin).filter((p) => p.woe != null).map((p) => ({ name: p.name, rhythm: p.woe, place: p.place }));
-  return { vaultName: VAULT_NAME, config, kin, inner, tending, thinking: { ...thinking, woes }, garden: gardenState, at: Date.now() };
+  return { vaultName: VAULT_NAME, config, kin, inner, tending, thinking: { ...thinking, woes }, innerScreen, garden: gardenState, at: Date.now() };
 }
 
 export const kinPeople = (kin: Awaited<ReturnType<typeof kinState>>): Person[] =>

@@ -108,6 +108,28 @@ describe("thinking", () => {
   });
 });
 
+describe("inner screen", () => {
+  test("proprioception moments, newest first, without the template's placeholder", () => {
+    const p = s.innerScreen.proprioception!;
+    expect(p.count).toBe(2);
+    expect(p.moments.map((m) => [m.date, m.title])).toEqual([
+      ["2026-10-09", "a message left unread"],
+      ["2026-10-02", "the meeting ran long"],
+    ]);
+    expect(p.weekly).toContain("the body registers first");
+  });
+
+  test("the coordination partner note and the thinking outputs in Rough Notes", () => {
+    expect(s.innerScreen.coordination?.sections.map((x) => x.heading)).toEqual(["Active"]);
+    expect(s.innerScreen.notes.map((n) => n.kind).sort()).toEqual(["Emergent", "Emergent", "Visionary fiction"]);
+  });
+
+  test("an empty vault has an empty inner screen", async () => {
+    const empty = await state(join(import.meta.dir, "fixtures/nowhere"));
+    expect(empty.innerScreen).toEqual({ proprioception: null, coordination: null, notes: [] });
+  });
+});
+
 test("wiki links open in Obsidian", () => {
   expect(md("see [[Ana Exemplo]]")).toContain('href="obsidian://open?vault=pandora&amp;file=Ana%20Exemplo"');
 });

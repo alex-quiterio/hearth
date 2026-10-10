@@ -134,9 +134,12 @@ function render() {
   $("#garden").innerHTML = gardenSvg();
   $("#legend").innerHTML = legend();
 
-  const byPanel = { focus: frostSection, "weak-points": weatherSection, rings: bedsSection, inner: soilSection, thinking: thinkingSection };
+  // Inner work and practice live on the Inner screen; the kin screen keeps the rest, in config order.
+  const byPanel = { focus: frostSection, "weak-points": weatherSection, rings: bedsSection };
   const rest = config.panels.filter((p) => byPanel[p]).map((p) => byPanel[p]());
   $("#sections").innerHTML = [wateringSection(), askingSection(), ...rest, journalSection()].join("");
+  $("#innerScreen").innerHTML = innerScreen();
+  showScreen();
   window.scrollTo(0, y);
 }
 
@@ -409,6 +412,67 @@ function thinkingSection() {
     </div></section>`;
 }
 
+/* ---------- screens ---------- */
+
+const screen = () => (location.hash === "#inner" ? "inner" : "kin");
+function showScreen() {
+  const s = screen();
+  $("#kinScreen").hidden = s !== "kin";
+  $("#innerScreen").hidden = s !== "inner";
+  document.body.dataset.screen = s;
+  document.querySelectorAll("[data-screen]").forEach((a) => a.setAttribute("aria-current", a.dataset.screen === s ? "page" : "false"));
+}
+window.addEventListener("hashchange", () => { showScreen(); window.scrollTo(0, 0); });
+
+// The skills this screen launches, from the menu when it has loaded, else a fixed few.
+const INNER_FALLBACK = [
+  ["/inner-work:jung-therapist", "Jung session"], ["/inner-work:proprioception", "Proprioception"],
+  ["/inner-work:journal-therapist", "Journal patterns"], ["/thinking:emergent-practice", "A practice for today"],
+  ["/thinking:emergent", "Unstick a plan"], ["/thinking:atomic-notes", "Atomic notes"],
+];
+function innerLaunch() {
+  const groups = MENU.filter((g) => g.plugin === "inner-work" || g.plugin === "thinking");
+  const items = groups.length
+    ? groups.flatMap((g) => g.items.map((it) => [it.command, it.name, it.hint, g.icon]))
+    : INNER_FALLBACK.map(([c, n]) => [c, n, "", ""]);
+  return `<section class="panel inner-launch"><h2>Begin</h2><div class="menu">${items.map(([c, n, h, icon]) =>
+    `<button class="menu-item" data-run="${esc(c)}" title="${esc(c)}"><span class="menu-icon" aria-hidden="true">${icon}</span><span><span class="menu-name">${esc(n)}</span>${h ? `<span class="menu-hint">${esc(h)}</span>` : ""}</span></button>`).join("")}</div></section>`;
+}
+
+function proprioceptionSection() {
+  const p = S.innerScreen?.proprioception;
+  if (!p) return "";
+  const moments = p.moments.map((m) => `<h3>${esc(m.title || "a moment")} <span class="sub">${esc(m.date)}</span></h3><div class="html">${m.html}</div>`).join("");
+  return `<section class="panel"><h2>Proprioception <span class="sub">${p.count} moment${p.count === 1 ? "" : "s"}</span>
+      <button class="tiny" data-run="/inner-work:proprioception">A moment</button></h2>
+    ${moments || `<p class="muted">No moments logged yet.</p>`}
+    ${p.weekly ? `<div class="label">Weekly</div><div class="html">${p.weekly}</div>` : ""}</section>`;
+}
+
+function coordinationSection() {
+  const c = S.innerScreen?.coordination;
+  if (!c) return "";
+  return `<section class="panel"><h2>Coordination partner <button class="tiny" data-run="/thinking:coordination-partner">Check in</button></h2>
+    ${c.sections.slice(0, 2).map((x) => `<h3>${esc(x.heading)}</h3><div class="html">${x.html}</div>`).join("")}</section>`;
+}
+
+function notesSection() {
+  const n = S.innerScreen?.notes ?? [];
+  if (!n.length) return "";
+  return `<section class="panel"><h2>Lately thought</h2><ul class="notes">${n.map((x) =>
+    `<li><a href="${obsidianLink(x.name)}">${esc(x.name)}</a> <span class="muted">${esc(new Date(x.mtime).toISOString().slice(0, 10))}</span></li>`).join("")}</ul></section>`;
+}
+
+function innerScreen() {
+  if (!S) return "";
+  return [
+    innerLaunch(),
+    soilSection(),
+    `<div class="inner-cols">${proprioceptionSection()}${thinkingSection()}</div>`,
+    `<div class="inner-cols">${coordinationSection()}${notesSection()}</div>`,
+  ].join("");
+}
+
 /* ---------- main menu ---------- */
 
 let MENU = [];
@@ -417,7 +481,7 @@ async function loadMenu() {
   try {
     const res = await fetch("/api/menu");
     menuError = res.ok ? "" : res.status === 404 ? "This server predates the menu: stop it and open Hearth again." : `The menu did not load (${res.status}).`;
-    if (res.ok) MENU = await res.json();
+    if (res.ok) { MENU = await res.json(); if (S) $("#innerScreen").innerHTML = innerScreen(); }
   } catch (e) {
     menuError = `The menu did not load: ${e.message}`;
   }
@@ -454,6 +518,7 @@ async function openMenu() {
   $("#menuSearch").focus();
 }
 $("#menuOpen").onclick = openMenu;
+loadMenu();
 $("#menuSearch").addEventListener("input", renderMenu);
 $("#menuSearch").addEventListener("keydown", (e) => {
   if (e.key !== "Enter") return;
