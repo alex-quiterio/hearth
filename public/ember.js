@@ -151,8 +151,12 @@ window.emberGame = function emberGame(host) {
   const onKey = (e) => {
     if (!cv.isConnected) return;
     if (e.type === "keydown" && (e.key === " " || e.key === "Enter")) { e.preventDefault(); start(); }
-    if (e.key.startsWith("Arrow")) e.preventDefault();
-    keys[e.key] = e.type === "keydown";
+    const k = e.key?.length === 1 ? e.key.toLowerCase() : e.key;
+    if (!k) return;
+    if (k.startsWith("Arrow")) e.preventDefault();
+    // A key takes over from a mouse resting on the canvas, which would otherwise pull the fire back every frame.
+    if (e.type === "keydown" && ["ArrowLeft", "ArrowRight", "a", "d"].includes(k)) pointerX = null;
+    keys[k] = e.type === "keydown";
   };
   const toX = (e) => ((e.clientX - cv.getBoundingClientRect().left) / cv.getBoundingClientRect().width) * W;
   cv.addEventListener("pointermove", (e) => (pointerX = toX(e)));
