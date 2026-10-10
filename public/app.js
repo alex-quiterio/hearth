@@ -412,11 +412,15 @@ function thinkingSection() {
 /* ---------- main menu ---------- */
 
 let MENU = [];
+let menuError = "";
 async function loadMenu() {
   try {
     const res = await fetch("/api/menu");
+    menuError = res.ok ? "" : res.status === 404 ? "This server predates the menu: stop it and open Hearth again." : `The menu did not load (${res.status}).`;
     if (res.ok) MENU = await res.json();
-  } catch {}
+  } catch (e) {
+    menuError = `The menu did not load: ${e.message}`;
+  }
 }
 
 function renderMenu() {
@@ -438,7 +442,7 @@ function renderMenu() {
   }).join("");
   $("#menuBody").innerHTML =
     (hearth ? `<section class="menu-group"><h3>🔥 hearth</h3><div class="menu">${hearth}</div></section>` : "") +
-    (groups || (MENU.length ? "" : `<p class="muted">No buchecha checkout found, so only the hearth's own actions are here.</p>`)) ||
+    (groups || (MENU.length ? "" : `<p class="muted">${esc(menuError || "No buchecha checkout found, so only the hearth's own actions are here.")}</p>`)) ||
     `<p class="muted">Nothing matches “${esc(q)}”.</p>`;
 }
 
