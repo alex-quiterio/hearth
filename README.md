@@ -69,7 +69,8 @@ anything, every single time. The server listens on 127.0.0.1 only.
 `bun run password` sets a password (and changing it logs out every browser). From then on
 the page asks for it once per browser and remembers it for a year, through restarts; the
 form is a normal login, so the browser's password manager can save it. **🔒 Lock** in the
-header logs this browser out until the password is given again. The hash and the
+header logs this browser out until the password is given again, and the page does the same
+on its own after 30 seconds with no input (never while Claude is working). The hash and the
 cookie secret live in `~/.config/hearth/auth.json`, outside the repo. With no password set
 there is no login, which is fine while only this Mac can reach the page. Set one before
 sharing it over Tailscale (`tailscale serve --bg 4747`).

@@ -1120,6 +1120,20 @@ listen();
 /* Stop the server from the page. The launcher (Hearth.app) starts it again. */
 $("#logout").onclick = () => $("#logoutForm").submit();
 
+/* Lock on its own after 30 s with no input, when a password is set. Never while Claude is
+   working: locking would cut the reply off. A hidden tab's timers sleep, so check on return too. */
+const IDLE_MS = 30_000;
+let lastInput = Date.now();
+for (const ev of ["pointerdown", "pointermove", "keydown", "wheel", "scroll", "touchstart"])
+  addEventListener(ev, () => (lastInput = Date.now()), { passive: true, capture: true });
+function lockIfIdle() {
+  if (!S?.auth || stopped) return;
+  if (running) return void (lastInput = Date.now());
+  if (Date.now() - lastInput >= IDLE_MS) $("#logoutForm").submit();
+}
+setInterval(lockIfIdle, 1000);
+document.addEventListener("visibilitychange", lockIfIdle);
+
 $("#shutdown").onclick = async () => {
   if (!confirm("Stop the Hearth server? Open Hearth.app to start it again.")) return;
   try { await fetch("/api/shutdown", { method: "POST" }); } catch {}
