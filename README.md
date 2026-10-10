@@ -47,6 +47,16 @@ Reads, skills and plain `obsidian …` CLI calls run without asking. Everything 
 Allow / Deny card in the chat, and so does any Beeper call that sends, edits or marks
 anything, every single time. The server listens on 127.0.0.1 only.
 
+## Login
+
+`bun run password` sets a password (and changing it logs out every browser). From then on
+the page asks for it once per browser and remembers it for a year, through restarts; the
+form is a normal login, so the browser's password manager can save it. **🔒 Lock** in the
+header logs this browser out until the password is given again. The hash and the
+cookie secret live in `~/.config/hearth/auth.json`, outside the repo. With no password set
+there is no login, which is fine while only this Mac can reach the page. Set one before
+sharing it over Tailscale (`tailscale serve --bg 4747`).
+
 ## Config
 
 Copy `.env.example` to `.env` (Bun loads it on its own; `.env` is git-ignored).
@@ -56,6 +66,7 @@ Copy `.env.example` to `.env` (Bun loads it on its own; `.env` is git-ignored).
 | `HEARTH_VAULT` | the Obsidian vault named `pandora`, found in Obsidian's own config |
 | `HEARTH_VAULT_NAME` | `pandora` |
 | `HEARTH_PORT` | `4747` |
+| `HEARTH_AUTH_FILE` | `~/.config/hearth/auth.json`: the password hash and cookie secret |
 | `ANTHROPIC_API_KEY` | unset: runs on your Claude Code login. Set, every turn bills that API key |
 
 ## Testing

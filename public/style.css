@@ -330,7 +330,8 @@ body.claude-working #send { background: transparent; color: var(--moss); }
 .queued-meta .linkish { font-size: 12px; }
 
 .top { position: relative; }
-.power { position: absolute; top: 4px; right: 0; font-size: 12.5px; padding: 5px 11px; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; }
+.powers { position: absolute; top: 4px; right: 0; display: flex; gap: 6px; }
+.power { font-size: 12.5px; padding: 5px 11px; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; }
 .power:hover { color: var(--clay-ink); border-color: var(--clay); }
 .stopped { max-width: 520px; margin: 10vh auto; padding: 0 16px; text-align: center; }
 .ember-game { max-width: 480px; margin: 12px auto 0; }

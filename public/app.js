@@ -9,6 +9,14 @@ const RING_ORDER = ["core", "close", "warm", "new", "drifting"];
 const RING_NAME = { core: "Core", close: "Close", warm: "Warm", new: "New", drifting: "Drifting" };
 const FROM = { thread: "a thread you wrote", tending: "the tending log", water: "marked tended here", map: "the kin map" };
 
+// Logged out (password changed, or the year is up): every call answers 401, so go back to the login page.
+const rawFetch = window.fetch.bind(window);
+window.fetch = async (...args) => {
+  const res = await rawFetch(...args);
+  if (res.status === 401) location.href = "/login";
+  return res;
+};
+
 let S = null;
 let G = null; // garden, from the server or derived
 let placeFilter = "all";
@@ -28,6 +36,7 @@ async function load() {
     if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
     S = await res.json();
     G = S.garden ?? deriveGarden(S);
+    $("#logout").hidden = !S.auth;
     for (const n of watered) applyWater(n);
     render();
   } catch (e) {
@@ -847,6 +856,8 @@ load();
 listen();
 
 /* Stop the server from the page. The launcher (Hearth.app) starts it again. */
+$("#logout").onclick = () => $("#logoutForm").submit();
+
 $("#shutdown").onclick = async () => {
   if (!confirm("Stop the Hearth server? Open Hearth.app to start it again.")) return;
   try { await fetch("/api/shutdown", { method: "POST" }); } catch {}

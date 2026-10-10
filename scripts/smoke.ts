@@ -4,6 +4,15 @@ const base = `http://127.0.0.1:${process.argv[2] ?? process.env.HEARTH_PORT ?? 4
 const ok = (m: string) => console.log(`  ✓ ${m}`);
 const fail = (m: string) => (console.error(`  ✗ ${m}`), process.exit(1));
 
+// With a password set, log in first: HEARTH_PASSWORD=… bun run smoke
+let jar = "";
+if (process.env.HEARTH_PASSWORD) {
+  const r = await globalThis.fetch(`${base}/login`, { method: "POST", body: new URLSearchParams({ password: process.env.HEARTH_PASSWORD }), redirect: "manual" });
+  jar = r.headers.get("set-cookie")?.split(";")[0] ?? "";
+  if (!jar) fail("login failed");
+}
+const fetch = (url: string, init: RequestInit = {}) => globalThis.fetch(url, { ...init, headers: { ...(init.headers as object), cookie: jar } });
+
 const page = await fetch(base).catch(() => fail(`nothing on ${base}; run \`bun start\` first`));
 if (!page || !(await page.text()).includes("<html")) fail("page did not load");
 ok("page loads");

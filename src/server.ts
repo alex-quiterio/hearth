@@ -5,6 +5,7 @@ import { waterPlant } from "./garden";
 import { chat, answerPermission, stop, listModels } from "./agent";
 import { sessions, transcript, forget } from "./history";
 import { saveAttachment, vaultFile, sweepAttachments, type Attachment } from "./attach";
+import { loadAuth, authed, login, logout, AUTH_FILE } from "./auth";
 
 const vault = await findVault();
 const PORT = Number(process.env.HEARTH_PORT ?? 4747);
@@ -36,13 +37,41 @@ setInterval(async () => {
 sweepAttachments();
 setInterval(sweepAttachments, 3600 * 1000);
 
+const hasPassword = await loadAuth();
+
+// Everything except the login page and what it needs is behind the password.
+const OPEN = new Set(["/login", "/style.css", "/favicon.svg", "/favicon.ico"]);
+type Handler = (req: any) => Response | Promise<Response>;
+function guard(h: Handler): Handler {
+  return (req: Request) => {
+    if (authed(req)) return h(req);
+    if (new URL(req.url).pathname.startsWith("/api/")) return Response.json({ error: "log in first" }, { status: 401 });
+    return Response.redirect("/login", 303);
+  };
+}
+function guardAll<T extends Record<string, Handler | Record<string, Handler>>>(routes: T): T {
+  const out: Record<string, unknown> = {};
+  for (const [path, r] of Object.entries(routes)) {
+    out[path] = OPEN.has(path) ? r
+      : typeof r === "function" ? guard(r)
+      : Object.fromEntries(Object.entries(r).map(([m, h]) => [m, guard(h)]));
+  }
+  return out as T;
+}
+
 const sse = (e: unknown) => `data: ${JSON.stringify(e)}\n\n`;
 
 Bun.serve({
   hostname: "127.0.0.1", // never off this machine: the vault holds inner work
   port: PORT,
   idleTimeout: 0,
-  routes: {
+  routes: guardAll({
+    "/login": {
+      GET: (req) => (authed(req) ? Response.redirect("/", 303) : new Response(Bun.file(join(PUBLIC, "login.html")))),
+      POST: login,
+    },
+    "/logout": { POST: logout },
+
     "/": () => new Response(Bun.file(join(PUBLIC, "index.html"))),
     "/app.js": () => new Response(Bun.file(join(PUBLIC, "app.js"))),
     "/ember.js": () => new Response(Bun.file(join(PUBLIC, "ember.js"))),
@@ -50,7 +79,7 @@ Bun.serve({
     "/favicon.svg": () => new Response(Bun.file(join(PUBLIC, "favicon.svg"))),
     "/favicon.ico": () => new Response(Bun.file(join(PUBLIC, "favicon.svg")), { headers: { "content-type": "image/svg+xml" } }),
 
-    "/api/state": async () => Response.json(await state(vault)),
+    "/api/state": async () => Response.json({ ...(await state(vault)), auth: hasPassword }),
 
     "/api/events": (req) => {
       let send: (at: number) => void;
@@ -154,8 +183,9 @@ Bun.serve({
         return Response.json({ ok: true });
       },
     },
-  },
+  }),
   fetch: () => new Response("not found", { status: 404 }),
 });
 
 console.log(`hearth · vault ${vault}\n        http://127.0.0.1:${PORT}`);
+if (!hasPassword) console.log(`        no password set (${AUTH_FILE}): run \`bun run password\` before sharing it beyond this Mac`);

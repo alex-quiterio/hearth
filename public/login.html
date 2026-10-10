@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#c4572e">
+  <title>Hearth</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .login { max-width: 340px; margin: 18vh auto 0; padding: 0 16px; text-align: center; }
+    .login h1 { margin-bottom: 4px; }
+    .login form { display: grid; gap: 10px; margin-top: 20px; }
+    .login input { font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+    .login button { font: inherit; padding: 10px; border-radius: 10px; border: 0; background: var(--clay); color: #fff; cursor: pointer; }
+    .login .note { min-height: 1.4em; color: var(--clay); font-size: 14px; }
+  </style>
+</head>
+<body>
+  <main class="login">
+    <h1>Hearth</h1>
+    <p class="muted">Say the word and the fire is yours.</p>
+    <!-- A fixed username so password managers save and fill this login. -->
+    <form method="post" action="/login">
+      <input type="text" name="username" value="hearth" autocomplete="username" hidden>
+      <input type="password" name="password" autocomplete="current-password" placeholder="Password" aria-label="Password" required autofocus>
+      <button type="submit">Come in</button>
+      <p class="note" id="note"></p>
+    </form>
+  </main>
+  <script>
+    const q = location.search;
+    document.getElementById("note").textContent =
+      q.includes("wrong") ? "Not that one." : q.includes("wait") ? "Too many tries. Wait a minute." : "";
+  </script>
+</body>
+</html>
