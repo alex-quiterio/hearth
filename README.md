@@ -24,7 +24,8 @@ pandora vault ──read──▶ hearth (Bun server) ──▶ browser dashboar
 - **The vault is the brain.** Hearth stores nothing. It reads `4 - Archive/kin/` (Kin map,
   Tending log, Own psychology, Own territory) and `4 - Archive/conversations/`, and
   refreshes the page when any of them change.
-- **Two screens.** 🫂 Kin is the garden, tending and rings. 🕯️ Inner (`#inner`) opens on the
+- **Two screens.** 🕯️ Inner comes first and is where Hearth opens; 🫂 Kin (`#kin`) is the
+  garden, tending and rings. Inner opens on the
   inner sky (a candle whose halo paces the breath, in for four and out for six; the last 28
   days as stars, lit where practice or a proprioception moment was logged; tonight's moon;
   a dandelion seed drifting for each spell) and gathers inner work and thinking: a Begin grid of every inner-work and thinking skill, Own psychology and

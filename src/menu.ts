@@ -6,11 +6,11 @@ import { readdir } from "node:fs/promises";
 
 export const PLUGINS_DIR = process.env.HEARTH_PLUGINS_DIR ?? join(homedir(), "code/alex-quiterio/buchecha/plugins");
 
-// Group order and icons, as in the buchecha README. Unknown plugins follow, alphabetically.
+// Group order and icons: the inner screen's plugins first, then as in the buchecha README. Unknown plugins follow, alphabetically.
 const GROUPS: Record<string, string> = {
-  kin: "🫂",
   "inner-work": "🕯️",
   thinking: "🧠",
+  kin: "🫂",
   homestead: "🌾",
   craft: "🛠️",
   writing: "✍️",

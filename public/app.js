@@ -414,7 +414,8 @@ function thinkingSection() {
 
 /* ---------- screens ---------- */
 
-const screen = () => (location.hash === "#inner" ? "inner" : "kin");
+// Inner is the first screen; the kin garden is #kin.
+const screen = () => (location.hash === "#kin" ? "kin" : "inner");
 function showScreen() {
   const s = screen();
   $("#kinScreen").hidden = s !== "kin";
