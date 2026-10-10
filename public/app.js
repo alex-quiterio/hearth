@@ -430,11 +430,15 @@ const INNER_FALLBACK = [
   ["/inner-work:jung-therapist", "Jung session"], ["/inner-work:proprioception", "Proprioception"],
   ["/inner-work:journal-therapist", "Journal patterns"], ["/thinking:emergent-practice", "A practice for today"],
   ["/thinking:emergent", "Unstick a plan"], ["/thinking:atomic-notes", "Atomic notes"],
+  ["/readings:tarot", "Tarot"],
 ];
+// Skills from other plugins that belong on this screen too.
+const INNER_EXTRA = ["/readings:tarot"];
 function innerLaunch() {
   const groups = MENU.filter((g) => g.plugin === "inner-work" || g.plugin === "thinking");
+  const extra = MENU.flatMap((g) => g.items.filter((it) => INNER_EXTRA.includes(it.command)).map((it) => [it.command, it.name, it.hint, g.icon]));
   const items = groups.length
-    ? groups.flatMap((g) => g.items.map((it) => [it.command, it.name, it.hint, g.icon]))
+    ? [...groups.flatMap((g) => g.items.map((it) => [it.command, it.name, it.hint, g.icon])), ...extra]
     : INNER_FALLBACK.map(([c, n]) => [c, n, "", ""]);
   return `<section class="panel inner-launch"><h2>Begin</h2><div class="menu">${items.map(([c, n, h, icon]) =>
     `<button class="menu-item" data-run="${esc(c)}" title="${esc(c)}"><span class="menu-icon" aria-hidden="true">${icon}</span><span><span class="menu-name">${esc(n)}</span>${h ? `<span class="menu-hint">${esc(h)}</span>` : ""}</span></button>`).join("")}</div></section>`;
