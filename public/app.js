@@ -126,7 +126,7 @@ function render() {
   if ($("#menu").open) renderMenu();
 
   const notices = [];
-  if (!config.exists) notices.push(`No <code>4 - Archive/kin/Hearth.md</code> yet, so the hearth runs on defaults.`);
+  if (!config.exists) notices.push(`No <code>${esc(config.path)}</code> yet, so the hearth runs on defaults.`);
   if (config.error) notices.push(`Hearth.md: ${esc(config.error)}`);
   if (!kin.exists) notices.push(`No Kin map yet. Run <code>/kin:map</code> to draw the first one.`);
   $("#notices").innerHTML = notices.map((n) => `<div class="notice">${n}</div>`).join("");

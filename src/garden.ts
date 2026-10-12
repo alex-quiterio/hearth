@@ -67,9 +67,11 @@ export function parseTending(text: string): Block[] {
   return blocks;
 }
 
-/** The tending block for this week: the latest one dated within the last 6 days. */
+/** The tending block for this week: the latest dated within the last 6 days. kin:tend puts new blocks on top, so go by date, not position. */
 const currentBlock = (blocks: Block[], today: string) =>
-  blocks.filter((b) => days(b.date, today) >= 0 && days(b.date, today) <= 6).at(-1) ?? null;
+  blocks
+    .filter((b) => days(b.date, today) >= 0 && days(b.date, today) <= 6)
+    .reduce<Block | null>((best, b) => (!best || b.date > best.date ? b : best), null);
 
 /** When each entry counts as water: an outcome's own date if it has one, else its block's. */
 function tendedOn(e: Entry, b: Block): string | null {

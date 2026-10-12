@@ -18,20 +18,29 @@ export async function findVault(): Promise<string> {
   return hit.path;
 }
 
+// Vault folders, set per machine in .env. Note names inside them are fixed by the skills that write them.
+const DIRS = {
+  kin: process.env.HEARTH_KIN_DIR ?? "4 - Archive/kin",
+  conversations: process.env.HEARTH_CONVERSATIONS_DIR ?? "4 - Archive/conversations",
+  practice: process.env.HEARTH_PRACTICE_DIR ?? "4 - Archive/practice",
+  projects: process.env.HEARTH_PROJECTS_DIR ?? "4 - Archive/projects",
+  rough: process.env.HEARTH_ROUGH_DIR ?? "1 - Rough Notes",
+};
+
 export const PATHS = {
-  kinDir: "4 - Archive/kin",
-  kinMap: "4 - Archive/kin/Kin map.md",
-  tendingLog: "4 - Archive/kin/Tending log.md",
-  hearth: "4 - Archive/kin/Hearth.md",
-  psychology: "4 - Archive/kin/Own psychology.md",
-  territory: "4 - Archive/kin/Own territory.md",
-  conversations: "4 - Archive/conversations",
-  proprioception: "4 - Archive/kin/Proprioception log.md",
-  coordination: "4 - Archive/projects/Coordination partner.md",
-  practiceDir: "4 - Archive/practice",
-  practiceLog: "4 - Archive/practice/Emergent practice.md",
-  spells: "4 - Archive/practice/Spells.md",
-  roughNotes: "1 - Rough Notes",
+  kinDir: DIRS.kin,
+  kinMap: `${DIRS.kin}/Kin map.md`,
+  tendingLog: `${DIRS.kin}/Tending log.md`,
+  hearth: `${DIRS.kin}/Hearth.md`,
+  psychology: `${DIRS.kin}/Own psychology.md`,
+  territory: `${DIRS.kin}/Own territory.md`,
+  conversations: DIRS.conversations,
+  proprioception: `${DIRS.kin}/Proprioception log.md`,
+  coordination: `${DIRS.projects}/Coordination partner.md`,
+  practiceDir: DIRS.practice,
+  practiceLog: `${DIRS.practice}/Emergent practice.md`,
+  spells: `${DIRS.practice}/Spells.md`,
+  roughNotes: DIRS.rough,
 };
 
 type Note = { frontmatter: Record<string, any>; body: string; mtime: number } | null;
@@ -313,6 +322,7 @@ export async function hearthConfig(vault: string) {
   const fm = note?.frontmatter ?? {};
   return {
     exists: !!note,
+    path: PATHS.hearth,
     error: fm._error ?? null,
     pinned: (fm.pinned ?? []) as { name: string; why?: string }[],
     watch: (fm.watch ?? []) as { name: string; why?: string; until?: string }[],

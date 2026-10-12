@@ -1,5 +1,6 @@
 import { query, type CanUseTool, type ModelInfo, type PermissionResult, type SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { resolve, sep } from "node:path";
+import { PATHS, VAULT_NAME } from "./vault";
 
 // One Claude Code session per conversation, resumed turn by turn. It loads the user's
 // settings, so every installed buchecha plugin and its skills are there as in the terminal.
@@ -109,7 +110,7 @@ export function summarize(tool: string, input: Record<string, unknown>): string 
   return s.length > 400 ? s.slice(0, 400) + "…" : s;
 }
 
-const append = (vault: string) => `You are running inside Hearth, Alex's local dashboard over his vault "pandora". He talks to you in a chat pane, not a terminal: ask questions in plain text (AskUserQuestion is unavailable) and keep replies short enough to read in a side panel. The dashboard re-reads the vault as soon as a skill writes to it, and its own configuration is the note "4 - Archive/kin/Hearth.md" (frontmatter: pinned, watch, actions, panels). When a session changes what matters (someone to keep an eye on, a date, a repair underway, a new routine worth a button), update that frontmatter and add one dated line under "## Changes" saying what changed and why.
+const append = (vault: string) => `You are running inside Hearth, Alex's local dashboard over his vault "${VAULT_NAME}". He talks to you in a chat pane, not a terminal: ask questions in plain text (AskUserQuestion is unavailable) and keep replies short enough to read in a side panel. The dashboard re-reads the vault as soon as a skill writes to it, and its own configuration is the note "${PATHS.hearth}" (frontmatter: pinned, watch, actions, panels). When a session changes what matters (someone to keep an eye on, a date, a repair underway, a new routine worth a button), update that frontmatter and add one dated line under "## Changes" saying what changed and why.
 
 The vault is at ${vault}. To write a note, use Edit or Write on its file there, or one plain \`obsidian\` command; both run without asking Alex. Do not wrap vault writes in python or shell scripts: every one of those stops him for approval.`;
 
