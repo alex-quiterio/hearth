@@ -37,6 +37,7 @@ async function load() {
     S = await res.json();
     G = S.garden ?? deriveGarden(S);
     $("#logout").hidden = $("#autoLock").hidden = !S.auth;
+    showAutoLock();
     for (const n of watered) applyWater(n);
     render();
   } catch (e) {
@@ -1124,17 +1125,17 @@ listen();
 /* Stop the server from the page. The launcher (Hearth.app) starts it again. */
 $("#logout").onclick = () => $("#logoutForm").submit();
 
-/* Lock on its own after 30 s with no input, when a password is set. Never while Claude is
+/* Lock on its own after HEARTH_LOCK_AFTER seconds (30 by default) with no input, when a password is set. Never while Claude is
    working: locking would cut the reply off. A hidden tab's timers sleep, so check on return too.
    Off by default; each browser can turn it on, and the choice is remembered. */
-const IDLE_MS = 30_000;
+const lockAfter = () => S?.lockAfter ?? 30;
 let lastInput = Date.now();
 let autoLock = store.get("hearth.autoLock") === "1";
 function showAutoLock() {
   const b = $("#autoLock");
   b.textContent = autoLock ? "⏱ Auto-lock on" : "⏱ Auto-lock off";
   b.title = autoLock
-    ? "Locks this browser after 30 seconds with no input. Click to turn it off"
+    ? `Locks this browser after ${lockAfter()} seconds with no input. Click to turn it off`
     : "Auto-lock is off on this browser. Click to turn it on";
   b.setAttribute("aria-pressed", String(autoLock));
 }
@@ -1150,7 +1151,7 @@ for (const ev of ["pointerdown", "pointermove", "keydown", "wheel", "scroll", "t
 function lockIfIdle() {
   if (!S?.auth || !autoLock || stopped) return;
   if (running) return void (lastInput = Date.now());
-  if (Date.now() - lastInput >= IDLE_MS) $("#logoutForm").submit();
+  if (Date.now() - lastInput >= lockAfter() * 1000) $("#logoutForm").submit();
 }
 setInterval(lockIfIdle, 1000);
 document.addEventListener("visibilitychange", lockIfIdle);

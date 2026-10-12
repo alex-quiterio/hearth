@@ -70,7 +70,7 @@ anything, every single time. The server listens on 127.0.0.1 only.
 the page asks for it once per browser and remembers it for a year, through restarts; the
 form is a normal login, so the browser's password manager can save it. **🔒 Lock** in the
 header logs this browser out until the password is given again. **⏱ Auto-lock** next to it
-makes the page do the same on its own after 30 seconds with no input (never while Claude is
+makes the page do the same on its own after `HEARTH_LOCK_AFTER` seconds (30 by default) with no input (never while Claude is
 working); it is off until turned on, per browser. The hash and the
 cookie secret live in `~/.config/hearth/auth.json`, outside the repo. With no password set
 there is no login, which is fine while only this Mac can reach the page. Set one before
@@ -85,6 +85,7 @@ Copy `.env.example` to `.env` (Bun loads it on its own; `.env` is git-ignored).
 | `HEARTH_VAULT` | the Obsidian vault named `pandora`, found in Obsidian's own config |
 | `HEARTH_VAULT_NAME` | `pandora` |
 | `HEARTH_PORT` | `4747` |
+| `HEARTH_LOCK_AFTER` | `30`: seconds with no input before ⏱ Auto-lock locks the page |
 | `HEARTH_KIN_DIR` | `4 - Archive/kin`: Kin map, Tending log, Hearth.md, Own psychology, Own territory, Proprioception log |
 | `HEARTH_CONVERSATIONS_DIR` | `4 - Archive/conversations`: one file per person |
 | `HEARTH_PRACTICE_DIR` | `4 - Archive/practice`: Emergent practice, Spells |

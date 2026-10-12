@@ -10,6 +10,7 @@ import { menu } from "./menu";
 
 const vault = await findVault();
 const PORT = Number(process.env.HEARTH_PORT ?? 4747);
+const LOCK_AFTER = Number(process.env.HEARTH_LOCK_AFTER ?? 30); // seconds of no input before auto-lock
 const PUBLIC = join(import.meta.dir, "../public");
 
 // Vault change fan-out: one watcher per folder, debounced, broadcast to every open tab.
@@ -80,7 +81,7 @@ Bun.serve({
     "/favicon.svg": () => new Response(Bun.file(join(PUBLIC, "favicon.svg"))),
     "/favicon.ico": () => new Response(Bun.file(join(PUBLIC, "favicon.svg")), { headers: { "content-type": "image/svg+xml" } }),
 
-    "/api/state": async () => Response.json({ ...(await state(vault)), auth: hasPassword }),
+    "/api/state": async () => Response.json({ ...(await state(vault)), auth: hasPassword, lockAfter: LOCK_AFTER }),
     "/api/menu": async () => Response.json(await menu()),
 
     "/api/events": (req) => {
