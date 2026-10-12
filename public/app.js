@@ -36,7 +36,7 @@ async function load() {
     if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
     S = await res.json();
     G = S.garden ?? deriveGarden(S);
-    $("#logout").hidden = !S.auth;
+    $("#logout").hidden = $("#autoLock").hidden = !S.auth;
     for (const n of watered) applyWater(n);
     render();
   } catch (e) {
@@ -1125,13 +1125,30 @@ listen();
 $("#logout").onclick = () => $("#logoutForm").submit();
 
 /* Lock on its own after 30 s with no input, when a password is set. Never while Claude is
-   working: locking would cut the reply off. A hidden tab's timers sleep, so check on return too. */
+   working: locking would cut the reply off. A hidden tab's timers sleep, so check on return too.
+   Off by default; each browser can turn it on, and the choice is remembered. */
 const IDLE_MS = 30_000;
 let lastInput = Date.now();
+let autoLock = store.get("hearth.autoLock") === "1";
+function showAutoLock() {
+  const b = $("#autoLock");
+  b.textContent = autoLock ? "⏱ Auto-lock on" : "⏱ Auto-lock off";
+  b.title = autoLock
+    ? "Locks this browser after 30 seconds with no input. Click to turn it off"
+    : "Auto-lock is off on this browser. Click to turn it on";
+  b.setAttribute("aria-pressed", String(autoLock));
+}
+showAutoLock();
+$("#autoLock").onclick = () => {
+  autoLock = !autoLock;
+  store.set("hearth.autoLock", autoLock ? "1" : "0");
+  lastInput = Date.now();
+  showAutoLock();
+};
 for (const ev of ["pointerdown", "pointermove", "keydown", "wheel", "scroll", "touchstart"])
   addEventListener(ev, () => (lastInput = Date.now()), { passive: true, capture: true });
 function lockIfIdle() {
-  if (!S?.auth || stopped) return;
+  if (!S?.auth || !autoLock || stopped) return;
   if (running) return void (lastInput = Date.now());
   if (Date.now() - lastInput >= IDLE_MS) $("#logoutForm").submit();
 }
