@@ -79,6 +79,21 @@ cookie secret live in `~/.config/hearth/auth.json`, outside the repo. With no pa
 there is no login, which is fine while only this Mac can reach the page. Set one before
 sharing it over Tailscale (`tailscale serve --bg 4747`).
 
+## On a phone
+
+Hearth installs as an app on Android (and on an iPhone's home screen). The server still listens on
+127.0.0.1 only; the phone reaches it through Tailscale, which also gives it the `https://` address
+Android needs before it offers to install:
+
+1. Set a password first: `bun run password`.
+2. On the Mac: `tailscale serve --bg 4747`. It prints `https://<mac>.<tailnet>.ts.net`.
+3. On the phone, with Tailscale on: open that address in Chrome, log in, then ⋮ → **Add to Home
+   screen** (or **Install app**).
+
+It opens full screen with the flame icon; a long press on the icon jumps to Inner or Kin. The
+service worker caches nothing, so no vault content is kept on the phone. When the Mac can't be
+reached it shows a "hearth is asleep" page instead of the browser's error.
+
 ## Config
 
 Copy `.env.example` to `.env` (Bun loads it on its own; `.env` is git-ignored).
