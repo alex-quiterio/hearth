@@ -37,6 +37,7 @@ export const PATHS = {
   conversations: DIRS.conversations,
   proprioception: `${DIRS.kin}/Proprioception log.md`,
   coordination: `${DIRS.projects}/Coordination partner.md`,
+  projectsDir: DIRS.projects,
   practiceDir: DIRS.practice,
   practiceLog: `${DIRS.practice}/Emergent practice.md`,
   spells: `${DIRS.practice}/Spells.md`,
@@ -291,22 +292,29 @@ export async function innerScreenState(vault: string) {
     })
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  // What the thinking skills leave in Rough Notes, newest first.
-  const OUTPUTS = /^(Emergent|Visionary fiction|Work rhythm|Climate geopolitics brief|Crossing) .*\.md$/;
-  let notes: { name: string; kind: string; mtime: number }[] = [];
-  try {
-    const dir = join(vault, PATHS.roughNotes);
-    notes = await Promise.all(
-      (await readdir(dir))
-        .filter((f) => OUTPUTS.test(f))
-        .map(async (f) => ({
-          name: f.replace(/\.md$/, ""),
-          kind: f.match(OUTPUTS)![1]!,
-          mtime: (await stat(join(dir, f))).mtimeMs,
-        })),
-    );
-    notes.sort((a, b) => b.mtime - a.mtime);
-  } catch {}
+  // What the thinking skills leave in Rough Notes, plus the monthly crossing pages kept in projects, newest first.
+  const OUTPUTS: [string, RegExp][] = [
+    [PATHS.roughNotes, /^(Emergent|Visionary fiction|Work rhythm|Climate geopolitics brief|Crossing) .*\.md$/],
+    [PATHS.projectsDir, /^(Crossing) \d{4}-\d{2}\.md$/],
+  ];
+  const notes: { name: string; kind: string; mtime: number }[] = [];
+  for (const [rel, re] of OUTPUTS) {
+    try {
+      const dir = join(vault, rel);
+      notes.push(
+        ...(await Promise.all(
+          (await readdir(dir))
+            .filter((f) => re.test(f))
+            .map(async (f) => ({
+              name: f.replace(/\.md$/, ""),
+              kind: f.match(re)![1]!,
+              mtime: (await stat(join(dir, f))).mtimeMs,
+            })),
+        )),
+      );
+    } catch {}
+  }
+  notes.sort((a, b) => b.mtime - a.mtime);
 
   return {
     proprioception: log
