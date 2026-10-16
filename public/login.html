@@ -6,6 +6,9 @@
   <meta name="theme-color" content="#c4572e">
   <title>Hearth</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="/style.css">
   <style>
@@ -51,5 +54,6 @@
     document.getElementById("note").textContent =
       q.includes("wrong") ? "Not that one." : q.includes("wait") ? "Too many tries. Wait a minute." : "";
   </script>
+  <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});</script>
 </body>
 </html>

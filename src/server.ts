@@ -42,7 +42,13 @@ setInterval(sweepAttachments, 3600 * 1000);
 const hasPassword = await loadAuth();
 
 // Everything except the login page and what it needs is behind the password.
-const OPEN = new Set(["/login", "/style.css", "/favicon.svg", "/favicon.ico"]);
+// The app's manifest, icons and service worker are open too: Android fetches them without the cookie, and they hold nothing private.
+const APP_FILES = ["manifest.webmanifest", "sw.js", "icon-192.png", "icon-512.png", "icon-maskable.png", "apple-touch-icon.png"];
+const APP_HEADERS: Record<string, ResponseInit> = {
+  "manifest.webmanifest": { headers: { "content-type": "application/manifest+json" } },
+  "sw.js": { headers: { "cache-control": "no-cache" } },
+};
+const OPEN = new Set(["/login", "/style.css", "/favicon.svg", "/favicon.ico", ...APP_FILES.map((f) => `/${f}`)]);
 type Handler = (req: any) => Response | Promise<Response>;
 function guard(h: Handler): Handler {
   return (req: Request) => {
@@ -80,6 +86,7 @@ Bun.serve({
     "/style.css": () => new Response(Bun.file(join(PUBLIC, "style.css"))),
     "/favicon.svg": () => new Response(Bun.file(join(PUBLIC, "favicon.svg"))),
     "/favicon.ico": () => new Response(Bun.file(join(PUBLIC, "favicon.svg")), { headers: { "content-type": "image/svg+xml" } }),
+    ...Object.fromEntries(APP_FILES.map((f) => [`/${f}`, () => new Response(Bun.file(join(PUBLIC, f)), APP_HEADERS[f])])),
 
     "/api/state": async () => Response.json({ ...(await state(vault)), auth: hasPassword, lockAfter: LOCK_AFTER }),
     "/api/menu": async () => Response.json(await menu()),
