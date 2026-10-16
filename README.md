@@ -6,6 +6,7 @@ panel running the same buchecha skills as the terminal.
 ```bash
 bun install
 bun start            # http://127.0.0.1:4747
+bun run dev          # the same, restarting itself when src/ changes, so a refresh shows the latest
 ```
 
 Or build a double-clickable launcher with the flame icon: `scripts/make-app.sh` puts
