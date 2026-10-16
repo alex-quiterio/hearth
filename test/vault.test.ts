@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { state, md } from "../src/vault";
+import { state, md, servers } from "../src/vault";
 
 const VAULT = join(import.meta.dir, "fixtures/vault");
 const s = await state(VAULT);
@@ -151,4 +151,14 @@ describe("embers", () => {
   test("the template placeholder is not an ember", () => {
     expect(s.embers.some((e) => /YYYY/.test(e.date + e.title))).toBe(false);
   });
+});
+
+test("servers: hosts in order, made https origins, duplicates and junk dropped", () => {
+  expect(servers(["one.example.ts.net", "https://two.example.ts.net/", "one.example.ts.net", "http://127.0.0.1:4747", "::bad::"])).toEqual([
+    "https://one.example.ts.net",
+    "https://two.example.ts.net",
+    "http://127.0.0.1:4747",
+  ]);
+  expect(servers(undefined)).toEqual([]);
+  expect(servers("solo.example.ts.net")).toEqual(["https://solo.example.ts.net"]);
 });

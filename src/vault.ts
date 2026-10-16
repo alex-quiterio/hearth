@@ -360,6 +360,20 @@ export async function embersState(vault: string): Promise<Ember[]> {
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/** `servers:` in Hearth.md, in order of preference: bare hosts or URLs, each made an https origin. */
+export function servers(raw: unknown): string[] {
+  const list = Array.isArray(raw) ? raw : typeof raw === "string" ? [raw] : [];
+  const out: string[] = [];
+  for (const s of list) {
+    try {
+      const host = String(s).trim();
+      const origin = new URL(/^https?:\/\//.test(host) ? host : `https://${host}`).origin;
+      if (!out.includes(origin)) out.push(origin);
+    } catch {}
+  }
+  return out;
+}
+
 export async function hearthConfig(vault: string) {
   const note = await readNote(vault, PATHS.hearth);
   const fm = note?.frontmatter ?? {};
@@ -372,6 +386,7 @@ export async function hearthConfig(vault: string) {
     now: (fm.now ?? []) as { what: string; why?: string; run?: string; until?: string }[],
     actions: (fm.actions ?? []) as { label: string; prompt: string; hint?: string }[],
     panels: (fm.panels ?? ["focus", "thinking", "weak-points", "rings", "tending", "inner"]) as string[],
+    servers: servers(fm.servers),
     innerVeiled: fm.inner?.veiled ?? true,
     changes: note ? md(sections(note.body).find((s) => /^changes/i.test(s.heading))?.text ?? "") : "",
     changesRaw: note ? (sections(note.body).find((s) => /^changes/i.test(s.heading))?.text ?? "") : "",

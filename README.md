@@ -92,8 +92,21 @@ Android needs before it offers to install:
    screen** (or **Install app**).
 
 It opens full screen with the flame icon; a long press on the icon jumps to Inner or Kin. The
-service worker caches nothing, so no vault content is kept on the phone. When the Mac can't be
-reached it shows a "hearth is asleep" page instead of the browser's error.
+service worker keeps no vault content on the phone, only the list of Hearth servers.
+
+**More than one Mac.** List every Hearth server under `servers:` in `Hearth.md`, in order of
+preference (each Mac runs its own `tailscale serve`):
+
+```yaml
+servers:
+  - first-mac.your-tailnet.ts.net
+  - second-mac.your-tailnet.ts.net
+```
+
+When the server a page is on doesn't answer within 5 seconds, on opening or while open, the page
+tries the others in that order and moves to the first one that answers. Each server has its own
+login and its own conversation history; the vault they read is the same. When none answer, it shows
+"the hearth is asleep" instead of the browser's error.
 
 ## Config
 

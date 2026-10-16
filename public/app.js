@@ -28,6 +28,7 @@ const watered = new Set(); // optimistic waterings until the vault catches up
 let retry = null;
 let stopped = false; // stopped on purpose from the page: no relighting
 let events = null;
+let downSince = null; // when /api/state first failed in a row
 async function load() {
   clearTimeout(retry);
   if (stopped) return;
@@ -41,9 +42,14 @@ async function load() {
     showAutoLock();
     for (const n of watered) applyWater(n);
     render();
+    downSince = null;
+    navigator.serviceWorker?.controller?.postMessage({ servers: S.config.servers ?? [] });
   } catch (e) {
     // Never stay stuck: say so and keep trying (the server may be restarting).
     console.warn("state failed", e);
+    // Down for longer than a restart and there is another server: reload, and the service worker moves there.
+    downSince ??= Date.now();
+    if (Date.now() - downSince > 6000 && (S?.config?.servers ?? []).some((o) => o !== location.origin)) { location.reload(); return; }
     if (!S) {
       if (!$("#garden .ember-game")) {
         $("#garden").innerHTML = `<p class="muted relight">The fire went out, relighting… Keep this ember going while you wait.</p><div class="ember-slot"></div>`;
@@ -907,6 +913,8 @@ function listen() {
   let opened = false;
   // After a server restart the stream reconnects: reload in case we missed changes.
   es.onopen = () => { if (opened) load(); opened = true; };
+  // The stream dropped: check the server, so a dead one leads to the next server rather than waiting.
+  es.onerror = () => { clearTimeout(timer); timer = setTimeout(load, 1000); };
   es.onmessage = (m) => {
     try {
       if (JSON.parse(m.data).type === "vault") { clearTimeout(timer); timer = setTimeout(() => { watered.clear(); load(); }, 300); }
