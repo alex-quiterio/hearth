@@ -498,8 +498,8 @@ button.build:hover { border-color: var(--muted); }
 .server-list i.up { background: var(--t-fresh); }
 .server-list i.down { background: transparent; border: 2px solid var(--t-wilting); }
 .server-list .state { font-size: 13px; color: var(--ink-2); white-space: nowrap; }
-.server-list a.connect { font-size: 13px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); text-decoration: none; color: var(--ink); }
-.server-list a.connect:hover { border-color: var(--muted); }
+.server-list a.connect { display: inline-block; font-size: 20px; padding: 2px 6px; text-decoration: none; }
+.server-list a.connect:hover { transform: scale(1.15); }
 
 /* talk: who Alex talks to */
 .talk h3 { font-size: 17px; margin-top: 22px; }

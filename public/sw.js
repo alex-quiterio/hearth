@@ -23,7 +23,7 @@ h1{font:600 28px Georgia,serif;margin:0 0 6px}p{color:#8e8a7b;margin:0 0 18px}bu
 ul{list-style:none;margin:0 auto 18px;padding:0;max-width:360px;text-align:left}li{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid #23302b}
 li i{width:9px;height:9px;border-radius:50%;background:#8e8a7b;flex:none}li i.up{background:#7fb069}li i.down{background:#c4572e}
 li span{flex:1;min-width:0}li small{display:block;color:#8e8a7b;font-size:13px;overflow:hidden;text-overflow:ellipsis}
-li a{color:#e07a50;text-decoration:none;padding:6px 12px;border:1px solid #e07a50;border-radius:999px;font-size:14px}</style></head>
+li a{text-decoration:none;font-size:22px;padding:4px 8px}</style></head>
 <body><main><h1 id="h">🔥 Finding the hearth…</h1><p id="p">This server can't be reached, so trying the others.</p>
 <ul id="list"></ul><button onclick="location.reload()">Try again</button></main>
 <script>
@@ -34,7 +34,7 @@ const $ = (id) => document.getElementById(id);
 // Every server, this one first, each with a Connect link that works whatever its check says.
 $("list").innerHTML = [here, ...others].map((o, i) => '<li><i id="d' + i + '"></i><span><strong>' + name(o) + '</strong><small id="s' + i + '">' +
   (o === here ? "this one · not answering" : "checking…") + '</small></span>' +
-  (o === here ? "" : '<a href="' + o + location.pathname + location.search + location.hash + '">Connect</a>') + '</li>').join("");
+  (o === here ? "" : '<a href="' + o + location.pathname + location.search + location.hash + '" title="Connect to ' + name(o) + '" aria-label="Connect to ' + name(o) + '">🔌</a>') + '</li>').join("");
 $("d0").className = "down";
 // A cross-origin no-cors fetch of an open file: it resolves when the server is up, whatever it answers.
 const alive = (o) => Promise.race([

@@ -613,7 +613,7 @@ function openServers() {
     const here = o === location.origin;
     return `<li class="${here ? "here" : ""}"><i class="${here ? "up" : ""}" data-server="${i}"></i>
       <span class="who"><strong>${esc(serverName(o))}</strong><small>${esc(new URL(o).host)}${list.includes(o) ? "" : " · not in Hearth.md"}</small></span>
-      ${here ? `<span class="state">connected</span>` : `<span class="state" data-server-state="${i}">checking…</span><a class="connect" href="${esc(o + location.pathname + location.hash)}">Connect</a>`}</li>`;
+      ${here ? `<span class="state">connected</span>` : `<span class="state" data-server-state="${i}">checking…</span><a class="connect" href="${esc(o + location.pathname + location.hash)}" title="Connect to ${esc(serverName(o))}" aria-label="Connect to ${esc(serverName(o))}">🔌</a>`}</li>`;
   }).join("") || `<li>No servers listed yet: add <code>servers:</code> to Hearth.md.</li>`;
   $("#servers").showModal();
   all.forEach(async (o, i) => {
