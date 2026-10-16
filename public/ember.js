@@ -150,6 +150,8 @@ window.emberGame = function emberGame(host) {
   const start = () => { if (s.over) reset(); if (!s.started) { s.started = true; spawn(); } };
   const onKey = (e) => {
     if (!cv.isConnected) return;
+    // Typing in a field (the login password) is not playing: leave Space, Enter and the arrows to it.
+    if (e.target.closest?.("input, textarea, select, [contenteditable]")) return;
     if (e.type === "keydown" && (e.key === " " || e.key === "Enter")) { e.preventDefault(); start(); }
     const k = e.key?.length === 1 ? e.key.toLowerCase() : e.key;
     if (!k) return;

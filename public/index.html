@@ -34,7 +34,7 @@
         <div class="powers">
           <button class="power" id="autoLock" aria-pressed="false" hidden></button>
           <button class="power" id="logout" title="Lock Hearth on this browser: the password opens it again" hidden>🔒 Lock</button>
-          <button class="power" id="shutdown" title="Stop the Hearth server" aria-label="Stop the Hearth server">⏻ Stop server</button>
+          <button class="power" id="shutdown" hidden title="Stop the Hearth server" aria-label="Stop the Hearth server">⏻ Stop server</button>
         </div>
       </header>
       <div id="notices"></div>
@@ -63,10 +63,10 @@
         <strong>Conversation</strong>
         <span class="chat-status muted" id="chatStatus"></span>
         <div class="chat-tools">
-          <button class="ghost" id="historyBtn" title="Previous conversations" aria-expanded="false">History</button>
-          <button class="ghost" id="newChat" title="Start a new conversation">New</button>
-          <button class="ghost only-desktop" id="collapseChat" title="Fold to the side (\)" aria-label="Fold the conversation to the side">⇥</button>
-          <button class="ghost only-mobile" id="closeChat" aria-label="Close">✕</button>
+          <button class="ghost icon" id="historyBtn" title="Previous conversations" aria-label="Previous conversations" aria-expanded="false"></button>
+          <button class="ghost icon" id="newChat" title="Start a new conversation" aria-label="Start a new conversation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+          <button class="ghost icon only-desktop" id="collapseChat" title="Fold to the side (\)" aria-label="Fold the conversation to the side">⇥</button>
+          <button class="ghost icon only-mobile" id="closeChat" aria-label="Close">✕</button>
         </div>
       </div>
       <div class="history" id="history" hidden></div>
@@ -75,12 +75,12 @@
       </div>
       <form class="chat-input" id="form">
         <div class="attachments" id="attachments" hidden></div>
-        <textarea id="input" rows="2" placeholder="Write to Claude… (Enter to send, Shift+Enter for a new line)"></textarea>
+        <textarea id="input" rows="2" placeholder="Write to your AI buddy… (Enter to send, Shift+Enter for a new line)"></textarea>
         <div class="chat-buttons">
           <input type="file" id="file" multiple hidden>
           <button type="button" class="ghost attach" id="attach" title="Attach files (or drop them here, or paste an image)" aria-label="Attach files">📎</button>
           <button type="button" class="ghost" id="autoAllow" aria-pressed="false"></button>
-          <select id="model" title="Which Claude answers" aria-label="Model"><option value="">Default model</option></select>
+          <select id="model" title="Which AI model answers" aria-label="Model"><option value="">Default model</option></select>
           <button type="button" class="ghost" id="stop" hidden>Stop</button>
           <button type="submit" id="send">Send</button>
         </div>

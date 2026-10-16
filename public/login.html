@@ -22,6 +22,7 @@
     .login .peek { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); padding: 4px 10px; font-size: 13px; background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 8px; }
     .login .peek:hover { color: var(--ink); }
     .login .note { min-height: 1.4em; color: var(--clay); font-size: 14px; }
+    .login-ember { max-width: 480px; margin: 6vh auto 40px; padding: 0 16px; }
   </style>
 </head>
 <body>
@@ -39,6 +40,7 @@
       <p class="note" id="note"></p>
     </form>
   </main>
+  <div class="login-ember"></div>
   <script>
     const pw = document.getElementById("password"), peek = document.getElementById("peek");
     peek.onclick = () => {
@@ -54,6 +56,8 @@
     document.getElementById("note").textContent =
       q.includes("wrong") ? "Not that one." : q.includes("wait") ? "Too many tries. Wait a minute." : "";
   </script>
+  <script src="/ember.js"></script>
+  <script>window.emberGame?.(document.querySelector(".login-ember"));</script>
   <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});</script>
 </body>
 </html>
