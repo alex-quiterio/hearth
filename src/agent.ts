@@ -18,11 +18,13 @@ export type ChatEvent =
 const pending = new Map<string, (r: PermissionResult) => void>();
 let running: AbortController | null = null;
 
-export function answerPermission(id: string, allow: boolean): boolean {
+/** why: the optional reason typed on the Deny card, passed on so the next step can take it into account. */
+export function answerPermission(id: string, allow: boolean, why = ""): boolean {
   const resolve = pending.get(id);
   if (!resolve) return false;
   pending.delete(id);
-  resolve(allow ? { behavior: "allow" } : { behavior: "deny", message: "Alex declined this in Hearth." });
+  const reason = why.trim().slice(0, 500);
+  resolve(allow ? { behavior: "allow" } : { behavior: "deny", message: reason ? `Alex declined this in Hearth. Why: ${reason}` : "Alex declined this in Hearth." });
   return true;
 }
 

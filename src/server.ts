@@ -166,8 +166,8 @@ Bun.serve({
 
     "/api/permission": {
       POST: async (req) => {
-        const { id, allow } = (await req.json()) as { id: string; allow: boolean };
-        return Response.json({ ok: answerPermission(id, !!allow) });
+        const { id, allow, why } = (await req.json()) as { id: string; allow: boolean; why?: string };
+        return Response.json({ ok: answerPermission(id, !!allow, typeof why === "string" ? why : "") });
       },
     },
 

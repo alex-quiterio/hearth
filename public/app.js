@@ -1148,17 +1148,23 @@ function handle(ev) {
       waitingPermissions++;
       updateRailDot();
       const el = append("perm", `<strong>Your AI buddy wants to use ${esc(ev.tool)}</strong><pre>${esc(ev.summary)}</pre>
+        <input class="why" type="text" maxlength="500" placeholder="Why not? (optional, sent with Deny)">
         <div class="chat-buttons"><button class="ghost" data-deny>Deny</button><button class="primary" data-allow>Allow</button></div>`);
       const decide = async (allow) => {
+        if (!el.isConnected || !$(".chat-buttons", el)) return;
         delete el.dataset.open;
-        $(".chat-buttons", el).outerHTML = `<div class="done">${allow ? "Allowed" : "Denied"}</div>`;
+        const why = allow ? "" : $(".why", el).value.trim();
+        $(".why", el).remove();
+        $(".chat-buttons", el).outerHTML = `<div class="done">${allow ? "Allowed" : "Denied"}${why ? `: ${esc(why)}` : ""}</div>`;
         waitingPermissions = Math.max(0, waitingPermissions - 1);
         updateRailDot();
         renderWork();
-        await fetch("/api/permission", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: ev.id, allow }) });
+        await fetch("/api/permission", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: ev.id, allow, why }) });
       };
       $("[data-allow]", el).onclick = () => decide(true);
       $("[data-deny]", el).onclick = () => decide(false);
+      // Enter in the why box denies; it never allows by accident.
+      $(".why", el).onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); decide(false); } };
       // Only a card the server marked unguarded may be allowed for you; Beeper changes always wait.
       if (ev.guarded === false) el.dataset.open = "";
       if (ev.guarded === false && autoAllow) decide(true);

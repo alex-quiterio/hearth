@@ -261,6 +261,7 @@ button.name { cursor: pointer; } button.name:hover { color: var(--clay-ink); }
 .perm { border: 1.5px solid var(--amber); background: color-mix(in srgb, var(--amber) 10%, var(--surface)); border-radius: 12px; padding: 10px 12px; font-size: 14px; }
 .perm pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; background: var(--surface); padding: 8px; border-radius: 8px; max-height: 200px; overflow: auto; }
 .perm .done { font-size: 13px; color: var(--muted); }
+.perm .why { width: 100%; box-sizing: border-box; margin: 0 0 8px; font: inherit; font-size: 13px; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
 .stamp { align-self: center; font-size: 11px; color: var(--muted); }
 .chat-input { border-top: 1px solid var(--line); padding: 12px 16px; display: grid; gap: 8px; }
 .chat-input textarea { width: 100%; resize: vertical; font: inherit; font-size: 14.5px; border: 1px solid var(--line); border-radius: 12px; padding: 9px 11px; background: var(--bg); color: var(--ink); }
