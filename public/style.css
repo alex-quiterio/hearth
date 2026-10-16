@@ -441,3 +441,16 @@ body.chat-collapsed .chat-resize { display: none; }
 .now-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
 .now-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; background: var(--surface-2); border-radius: 12px; padding: 10px 12px; }
 .now-item p { margin: 4px 0 0; font-size: 13px; }
+
+/* an ember: one thing from the logs, brought back */
+.kindle { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 16px; align-items: start;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--amber) 14%, var(--surface)), var(--surface) 60%); }
+.kindle-glyph { font-size: 28px; line-height: 1; padding-top: 6px; filter: drop-shadow(0 0 10px color-mix(in srgb, var(--amber) 55%, transparent)); animation: kindle-glow 5s ease-in-out infinite; }
+.kindle .label { margin-top: 0; }
+.kindle h3 { margin: 2px 0 4px; }
+.kindle .html p { margin: 4px 0; }
+.kindle-from { font-size: 12.5px; margin: 6px 0 0; }
+.kindle-buttons { display: flex; flex-direction: column; gap: 6px; }
+@keyframes kindle-glow { 50% { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--amber) 30%, transparent)); } }
+@media (prefers-reduced-motion: reduce) { .kindle-glyph { animation: none; } }
+@media (max-width: 560px) { .kindle { grid-template-columns: auto 1fr; } .kindle-buttons { grid-column: 1 / -1; flex-direction: row; justify-content: flex-end; } }
