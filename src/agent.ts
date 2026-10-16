@@ -9,7 +9,7 @@ export type ChatEvent =
   | { type: "session"; sessionId: string }
   | { type: "text"; delta: string }
   | { type: "tool"; name: string; summary: string }
-  | { type: "permission"; id: string; tool: string; summary: string }
+  | { type: "permission"; id: string; tool: string; summary: string; guarded: boolean }
   | { type: "status"; text: string }
   | { type: "activity"; text: string }
   | { type: "done"; costUsd: number; isError: boolean; result?: string }
@@ -33,6 +33,8 @@ export function stop() {
 const READ_ONLY = new Set(["Read", "Glob", "Grep", "Skill", "ToolSearch", "WebSearch", "WebFetch", "TodoWrite", "Agent", "Task"]);
 // Anything on Beeper that changes the outside world asks first, every time.
 const BEEPER_WRITE = /send|edit|delete|archive|mark|react|set_|create|update|remind|pin|mute/i;
+/** A tool that always asks, even with auto-allow on. */
+export const guarded = (tool: string) => tool.startsWith("mcp__beeper__") && BEEPER_WRITE.test(tool.slice("mcp__beeper__".length));
 
 // Shell commands that only look. Read is already free for any path, so these add no reach.
 const LOOK = new Set(["cat", "head", "tail", "grep", "rg", "ls", "find", "wc", "date", "echo", "sort", "cut", "stat", "file", "pwd"]);
@@ -136,7 +138,8 @@ export function listModels(): Promise<ModelInfo[]> {
   return models;
 }
 
-export async function* chat(message: string, vault: string, sessionId?: string, model?: string): AsyncGenerator<ChatEvent> {
+/** autoAllow: the page's Auto-allow toggle. Everything runs without asking except Beeper tools that change anything. */
+export async function* chat(message: string, vault: string, sessionId?: string, model?: string, autoAllow = false): AsyncGenerator<ChatEvent> {
   running?.abort();
   const abort = new AbortController();
   running = abort;
@@ -148,9 +151,9 @@ export async function* chat(message: string, vault: string, sessionId?: string, 
   };
 
   const canUseTool: CanUseTool = async (tool, input, { signal }) => {
-    if (autoAllowed(tool, input, vault)) return { behavior: "allow", updatedInput: input };
+    if ((autoAllow && !guarded(tool)) || autoAllowed(tool, input, vault)) return { behavior: "allow", updatedInput: input };
     const id = crypto.randomUUID();
-    push({ type: "permission", id, tool, summary: summarize(tool, input) });
+    push({ type: "permission", id, tool, summary: summarize(tool, input), guarded: guarded(tool) });
     return new Promise<PermissionResult>((resolve) => {
       pending.set(id, (r) => resolve(r.behavior === "allow" ? { ...r, updatedInput: input } : r));
       signal.addEventListener("abort", () => answerPermission(id, false));

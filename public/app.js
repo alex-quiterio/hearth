@@ -1007,7 +1007,7 @@ async function send(message) {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ message, ...(sessionId && { sessionId }), ...($("#model").value && { model: $("#model").value }) }),
+      body: JSON.stringify({ message, ...(sessionId && { sessionId }), ...($("#model").value && { model: $("#model").value }), ...(autoAllow && { autoAllow }) }),
     });
     if (!res.ok || !res.body) throw new Error(`${res.status} ${await res.text()}`);
     const reader = res.body.getReader();
@@ -1056,6 +1056,7 @@ function handle(ev) {
       const el = append("perm", `<strong>Claude wants to use ${esc(ev.tool)}</strong><pre>${esc(ev.summary)}</pre>
         <div class="chat-buttons"><button class="ghost" data-deny>Deny</button><button class="primary" data-allow>Allow</button></div>`);
       const decide = async (allow) => {
+        delete el.dataset.open;
         $(".chat-buttons", el).outerHTML = `<div class="done">${allow ? "Allowed" : "Denied"}</div>`;
         waitingPermissions = Math.max(0, waitingPermissions - 1);
         updateRailDot();
@@ -1064,6 +1065,7 @@ function handle(ev) {
       };
       $("[data-allow]", el).onclick = () => decide(true);
       $("[data-deny]", el).onclick = () => decide(false);
+      if (!ev.guarded) el.dataset.open = "";
       renderWork();
       break;
     }
@@ -1121,6 +1123,26 @@ $("#closeChat").onclick = () => $("#chat").classList.remove("open");
 
 load();
 listen();
+
+/* Auto-allow: Claude runs every tool without the Allow/Deny card, except Beeper tools that change anything,
+   which the server always asks about. Off by default; each browser remembers its own choice.
+   Turning it on mid-turn also allows the cards already waiting. */
+let autoAllow = store.get("hearth.autoAllow") === "1";
+function showAutoAllow() {
+  const b = $("#autoAllow");
+  b.textContent = autoAllow ? "Auto-allow on" : "Auto-allow off";
+  b.title = autoAllow
+    ? "Claude runs every tool without asking (Beeper sends and changes still ask). Click to turn it off"
+    : "Claude asks before tools outside the vault. Click to let it run them without asking";
+  b.setAttribute("aria-pressed", String(autoAllow));
+}
+showAutoAllow();
+$("#autoAllow").onclick = () => {
+  autoAllow = !autoAllow;
+  store.set("hearth.autoAllow", autoAllow ? "1" : "0");
+  showAutoAllow();
+  if (autoAllow) document.querySelectorAll("#log .perm[data-open] [data-allow]").forEach((b) => b.click());
+};
 
 /* Stop the server from the page. The launcher (Hearth.app) starts it again. */
 $("#logout").onclick = () => $("#logoutForm").submit();

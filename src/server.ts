@@ -110,13 +110,13 @@ Bun.serve({
 
     "/api/chat": {
       POST: async (req) => {
-        const { message, sessionId, model } = (await req.json()) as { message?: string; sessionId?: string; model?: string };
+        const { message, sessionId, model, autoAllow } = (await req.json()) as { message?: string; sessionId?: string; model?: string; autoAllow?: boolean };
         if (!message?.trim()) return Response.json({ error: "empty message" }, { status: 400 });
         const enc = new TextEncoder();
         const stream = new ReadableStream({
           async start(c) {
             try {
-              for await (const e of chat(message, vault, sessionId, model && model !== "default" ? model : undefined)) c.enqueue(enc.encode(sse(e)));
+              for await (const e of chat(message, vault, sessionId, model && model !== "default" ? model : undefined, autoAllow === true)) c.enqueue(enc.encode(sse(e)));
             } catch (e) {
               c.enqueue(enc.encode(sse({ type: "error", message: (e as Error).message })));
             }
