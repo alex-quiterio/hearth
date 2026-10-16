@@ -484,6 +484,22 @@ body.chat-collapsed .chat-resize { display: none; }
 }
 .build::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--clay); box-shadow: 0 0 6px var(--clay); }
 .build span { font-family: Fraunces, Georgia, serif; font-weight: 600; letter-spacing: 0; color: var(--ink); }
+button.build { pointer-events: auto; cursor: pointer; }
+button.build:hover { border-color: var(--muted); }
+.build b:not(:empty)::before { content: "· "; font-weight: 400; color: var(--muted); }
+.build b { font-weight: 600; color: var(--ink); }
+.server-list { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
+.server-list li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.server-list li.here { background: var(--surface-2); }
+.server-list .who { flex: 1; min-width: 0; }
+.server-list .who strong { display: block; }
+.server-list .who small { color: var(--muted); overflow-wrap: anywhere; }
+.server-list i { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+.server-list i.up { background: var(--t-fresh); }
+.server-list i.down { background: transparent; border: 2px solid var(--t-wilting); }
+.server-list .state { font-size: 13px; color: var(--ink-2); white-space: nowrap; }
+.server-list a.connect { font-size: 13px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); text-decoration: none; color: var(--ink); }
+.server-list a.connect:hover { border-color: var(--muted); }
 
 /* talk: who Alex talks to */
 .talk h3 { font-size: 17px; margin-top: 22px; }

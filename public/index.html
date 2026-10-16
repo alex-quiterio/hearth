@@ -99,7 +99,13 @@
     <div id="menuBody"></div>
   </dialog>
   <button class="chat-fab only-mobile" id="openChat">Conversation</button>
-  <div class="build" title="Hearth version: the commit checked out, + when there are uncommitted changes"><span>hearth</span> v<!--SHA--></div>
+  <button class="build" id="serversOpen" title="Which Hearth server this is, and the others to connect to. Version: the commit checked out, + when there are uncommitted changes" aria-haspopup="dialog"><span>hearth</span> v<!--SHA--> <b id="serverHere"></b></button>
+  <dialog class="sheet" id="servers" aria-label="Servers">
+    <form method="dialog" class="sheet-close"><button class="ghost" aria-label="Close">✕</button></form>
+    <h2>Servers</h2>
+    <p class="muted">From <code>servers:</code> in Hearth.md, in order of preference. When this one stops answering, Hearth moves to the first one up.</p>
+    <ul class="server-list" id="serverList"></ul>
+  </dialog>
   <script src="/ember.js"></script>
   <script src="/app.js"></script>
   <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});</script>

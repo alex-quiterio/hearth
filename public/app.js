@@ -550,6 +550,36 @@ function talkTip() {
   return t;
 }
 
+/* ---------- servers: which Hearth this is, and the others to connect to ---------- */
+
+const serverName = (o) => { const h = new URL(o).hostname; return /^(127\.|localhost$)/.test(h) ? "this Mac" : h.split(".")[0]; };
+$("#serverHere").textContent = serverName(location.origin);
+// A no-cors fetch of an open file resolves when the server is up, whatever it answers.
+const serverUp = (o) => Promise.race([
+  fetch(`${o}/favicon.svg?ping=${Date.now()}`, { mode: "no-cors", cache: "no-store" }).then(() => true, () => false),
+  new Promise((r) => setTimeout(() => r(false), 5000)),
+]);
+function openServers() {
+  const list = S?.config?.servers ?? [];
+  const all = list.includes(location.origin) ? list : [location.origin, ...list];
+  $("#serverList").innerHTML = all.map((o, i) => {
+    const here = o === location.origin;
+    return `<li class="${here ? "here" : ""}"><i class="${here ? "up" : ""}" data-server="${i}"></i>
+      <span class="who"><strong>${esc(serverName(o))}</strong><small>${esc(new URL(o).host)}${list.includes(o) ? "" : " · not in Hearth.md"}</small></span>
+      ${here ? `<span class="state">connected</span>` : `<span class="state" data-server-state="${i}">checking…</span><a class="connect" href="${esc(o + location.pathname + location.hash)}">Connect</a>`}</li>`;
+  }).join("") || `<li>No servers listed yet: add <code>servers:</code> to Hearth.md.</li>`;
+  $("#servers").showModal();
+  all.forEach(async (o, i) => {
+    if (o === location.origin) return;
+    const up = await serverUp(o);
+    $(`[data-server="${i}"]`)?.setAttribute("class", up ? "up" : "down");
+    const st = $(`[data-server-state="${i}"]`);
+    if (st) st.textContent = up ? "up" : "not answering";
+  });
+}
+$("#serversOpen").addEventListener("click", openServers);
+$("#servers").addEventListener("click", (e) => { if (e.target === $("#servers")) $("#servers").close(); });
+
 /* ---------- screens ---------- */
 
 // Inner is the first screen; the kin garden is #kin; who Alex talks to is #talk.
