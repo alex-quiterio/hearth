@@ -12,6 +12,10 @@ const vault = await findVault();
 const PORT = Number(process.env.HEARTH_PORT ?? 4747);
 const LOCK_AFTER = Number(process.env.HEARTH_LOCK_AFTER ?? 30); // seconds of no input before auto-lock
 const PUBLIC = join(import.meta.dir, "../public");
+// The commit this server runs, shown at the foot of every page.
+const SHA = Bun.spawnSync(["git", "rev-parse", "--short=5", "HEAD"], { cwd: import.meta.dir }).stdout.toString().trim() || "?";
+const page = async (name: string) =>
+  new Response((await Bun.file(join(PUBLIC, name)).text()).replace("<!--SHA-->", SHA), { headers: { "content-type": "text/html; charset=utf-8" } });
 
 // Vault change fan-out: one watcher per folder, debounced, broadcast to every open tab.
 const listeners = new Set<(at: number) => void>();
@@ -76,12 +80,12 @@ Bun.serve({
   idleTimeout: 0,
   routes: guardAll({
     "/login": {
-      GET: (req) => (authed(req) ? Response.redirect("/", 303) : new Response(Bun.file(join(PUBLIC, "login.html")))),
+      GET: (req) => (authed(req) ? Response.redirect("/", 303) : page("login.html")),
       POST: login,
     },
     "/logout": { POST: logout },
 
-    "/": () => new Response(Bun.file(join(PUBLIC, "index.html"))),
+    "/": () => page("index.html"),
     "/app.js": () => new Response(Bun.file(join(PUBLIC, "app.js"))),
     "/ember.js": () => new Response(Bun.file(join(PUBLIC, "ember.js"))),
     "/style.css": () => new Response(Bun.file(join(PUBLIC, "style.css"))),

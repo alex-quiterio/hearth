@@ -56,6 +56,7 @@
     document.getElementById("note").textContent =
       q.includes("wrong") ? "Not that one." : q.includes("wait") ? "Too many tries. Wait a minute." : "";
   </script>
+  <div class="build" title="Commit this server runs"><!--SHA--></div>
   <script src="/ember.js"></script>
   <script>window.emberGame?.(document.querySelector(".login-ember"));</script>
   <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});</script>

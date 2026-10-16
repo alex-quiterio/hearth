@@ -472,3 +472,6 @@ body.chat-collapsed .chat-resize { display: none; }
 @keyframes kindle-glow { 50% { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--amber) 30%, transparent)); } }
 @media (prefers-reduced-motion: reduce) { .kindle-glyph { animation: none; } }
 @media (max-width: 560px) { .kindle { grid-template-columns: auto 1fr; } .kindle-buttons { grid-column: 1 / -1; flex-direction: row; justify-content: flex-end; } }
+
+/* The commit this server runs, quiet in the corner of every page. */
+.build { position: fixed; left: 8px; bottom: 6px; font: 11px ui-monospace, monospace; color: var(--muted); opacity: .7; pointer-events: none; z-index: 1; }
