@@ -48,7 +48,8 @@ const APP_HEADERS: Record<string, ResponseInit> = {
   "manifest.webmanifest": { headers: { "content-type": "application/manifest+json" } },
   "sw.js": { headers: { "cache-control": "no-cache" } },
 };
-const OPEN = new Set(["/login", "/style.css", "/favicon.svg", "/favicon.ico", ...APP_FILES.map((f) => `/${f}`)]);
+// ember.js is the small game at the bottom of the login page; it holds nothing private.
+const OPEN = new Set(["/login", "/style.css", "/ember.js", "/favicon.svg", "/favicon.ico", ...APP_FILES.map((f) => `/${f}`)]);
 type Handler = (req: any) => Response | Promise<Response>;
 function guard(h: Handler): Handler {
   return (req: Request) => {
