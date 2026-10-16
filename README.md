@@ -28,7 +28,10 @@ pandora vault ──read──▶ hearth (Bun server) ──▶ browser dashboar
   garden, tending and rings. Inner opens on the
   inner sky (a candle whose halo paces the breath, in for four and out for six; the last 28
   days as stars, lit where practice or a proprioception moment was logged; tonight's moon;
-  a dandelion seed drifting for each spell) and gathers inner work and thinking: a Begin grid of every inner-work and thinking skill, Own psychology and
+  a dandelion seed drifting for each spell), then **an ember**: one dated thing from the logs (a
+  proprioception moment, a practice, a spell, a tending gesture) at least a week old, from a year, a
+  season or a month ago today when there is one. **Sit with it** asks Claude to bring it back; **Another**
+  draws the next. It gathers inner work and thinking: a Begin grid of every inner-work and thinking skill, Own psychology and
   Own territory (veiled), the latest Proprioception moments, the Practice panel, the
   Coordination partner note, and what the thinking skills lately left in Rough Notes.
 - **One menu for every command.** ☰ Menu (or ⌘K) lists every buchecha skill, read from the

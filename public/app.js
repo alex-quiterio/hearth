@@ -564,11 +564,59 @@ function nowSection() {
     }).join("")}</div></section>`;
 }
 
+/* ---------- embers: one thing from the logs, brought back ---------- */
+
+// Older than a week, so it has had time to cool. An echo (a year, a season, a month ago today, give or take two days)
+// comes first; the rest follow in an order fixed for the day. "Another" walks on from there.
+const ECHOES = [[365, "a year ago today"], [182, "half a year ago"], [91, "a season ago"], [30, "a month ago"]];
+const EMBER_GLYPH = { moment: "🫀", practice: "🕯️", spell: "🌬️", tending: "🌱" };
+let emberStep = 0;
+function emberOrder() {
+  const today = Date.parse(G.today);
+  const old = (S.embers ?? []).filter((e) => today - Date.parse(e.date) >= 7 * 864e5);
+  const echoOf = (e) => ECHOES.find(([d]) => Math.abs((today - Date.parse(e.date)) / 864e5 - d) <= 2)?.[1] ?? null;
+  const key = (e) => hash(G.today + e.date + e.title);
+  const echoes = ECHOES.flatMap(([, label]) => old.filter((e) => echoOf(e) === label));
+  const rest = old.filter((e) => !echoOf(e)).sort((a, b) => key(a) - key(b));
+  return [...echoes, ...rest].map((e) => ({ ...e, echo: echoOf(e) }));
+}
+function emberAgo(date) {
+  const n = Math.round((Date.parse(G.today) - Date.parse(date)) / 864e5);
+  return n < 14 ? `${n} days ago` : n < 60 ? `${Math.round(n / 7)} weeks ago` : n < 548 ? `${Math.round(n / 30.4)} months ago` : `${Math.round(n / 365)} years ago`;
+}
+function emberSection() {
+  const all = G ? emberOrder() : [];
+  if (!all.length) return "";
+  const e = all[emberStep % all.length];
+  const when = new Date(e.date + "T12:00").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const prompt = `Bring back this ember from my ${e.note} note, ${e.date}: "${e.title}". Read that entry in the vault, tell me in two lines what I wrote then, and ask me one question about what has moved since. Don't write anything to the vault unless I ask.`;
+  return `<section class="panel kindle" aria-label="An ember from your logs">
+    <div class="kindle-glyph" aria-hidden="true">${EMBER_GLYPH[e.kind] ?? "✦"}</div>
+    <div class="kindle-body">
+      <div class="label">An ember · ${esc(e.echo ?? emberAgo(e.date))}</div>
+      <h3>${esc(e.title)}</h3>
+      ${e.html ? `<div class="html">${e.html}</div>` : ""}
+      <p class="muted kindle-from">${esc(when)} · <a href="${obsidianLink(e.note)}">${esc(e.note)}</a></p>
+    </div>
+    <div class="kindle-buttons">
+      <button class="tiny" data-run="${esc(prompt)}" title="Ask Claude to sit with this one">Sit with it</button>
+      ${all.length > 1 ? `<button class="tiny ghost" data-ember-next title="Another one (${all.length} to draw from)">Another</button>` : ""}
+    </div>
+  </section>`;
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-ember-next]");
+  if (!b) return;
+  emberStep++;
+  b.closest(".kindle").outerHTML = emberSection();
+});
+
 function innerScreen() {
   if (!S) return "";
   return [
     skySection(),
     nowSection(),
+    emberSection(),
     innerLaunch(),
     soilSection(),
     `<div class="inner-cols">${proprioceptionSection()}${thinkingSection()}</div>`,

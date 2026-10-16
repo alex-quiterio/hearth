@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { join, basename } from "node:path";
 import { readdir, stat } from "node:fs/promises";
-import { garden, threadSections } from "./garden";
+import { garden, threadSections, parseTending } from "./garden";
 
 // The vault is the single source of truth. Hearth only reads it; skills write it.
 
@@ -317,6 +317,49 @@ export async function innerScreenState(vault: string) {
   };
 }
 
+export type Ember = { date: string; kind: "moment" | "practice" | "spell" | "tending"; title: string; html: string; note: string };
+
+/** Every dated thing Alex has written down in the logs, for the Inner screen to bring one back. Oldest first. */
+export async function embersState(vault: string): Promise<Ember[]> {
+  const name = (rel: string) => basename(rel).replace(/\.md$/, "");
+  const [moments, log, spells, tending] = await Promise.all([
+    readNote(vault, PATHS.proprioception),
+    readNote(vault, PATHS.practiceLog),
+    readNote(vault, PATHS.spells),
+    Bun.file(join(vault, PATHS.tendingLog)).exists().then((ok) => (ok ? Bun.file(join(vault, PATHS.tendingLog)).text() : "")),
+  ]);
+  const out: Ember[] = [];
+
+  const momentsText = moments ? sections(moments.body).find((s) => /^moments/i.test(s.heading))?.text ?? "" : "";
+  for (const b of momentsText.split(/^(?=### )/m)) {
+    const m = b.trim().match(/^### (\d{4}-\d{2}-\d{2})\s*·?\s*(.*)\n?([\s\S]*)$/);
+    if (m) out.push({ date: m[1]!, kind: "moment", title: m[2]!.trim() || "a moment", html: md(m[3]!.trim()), note: name(PATHS.proprioception) });
+  }
+
+  const logText = log ? sections(log.body).find((s) => /^log/i.test(s.heading))?.text ?? "" : "";
+  for (const line of logText.split("\n")) {
+    const m = line.match(/^- (\d{4}-\d{2}-\d{2})\s*·?\s*(.+)$/);
+    if (m) out.push({ date: m[1]!, kind: "practice", title: m[2]!.trim(), html: "", note: name(PATHS.practiceLog) });
+  }
+
+  for (const s of spells ? sections(spells.body).filter((s) => s.heading) : []) {
+    const date = s.text.match(/\d{4}-\d{2}-\d{2}/)?.[0];
+    if (date) out.push({ date, kind: "spell", title: s.heading, html: md(s.text), note: name(PATHS.spells) });
+  }
+
+  for (const b of parseTending(tending))
+    for (const e of b.entries)
+      out.push({
+        date: e.outcome.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? b.date,
+        kind: "tending",
+        title: `${e.kind} · ${e.name}`,
+        html: md([e.gesture && `Gesture: ${e.gesture}`, e.outcome && `Outcome: ${e.outcome}`].filter(Boolean).join("\n\n")),
+        note: name(PATHS.tendingLog),
+      });
+
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
 export async function hearthConfig(vault: string) {
   const note = await readNote(vault, PATHS.hearth);
   const fm = note?.frontmatter ?? {};
@@ -336,17 +379,18 @@ export async function hearthConfig(vault: string) {
 }
 
 export async function state(vault: string, today?: string) {
-  const [config, kin, inner, tending, thinking, innerScreen] = await Promise.all([
+  const [config, kin, inner, tending, thinking, innerScreen, embers] = await Promise.all([
     hearthConfig(vault),
     kinState(vault),
     innerState(vault),
     tendingState(vault),
     thinkingState(vault),
     innerScreenState(vault),
+    embersState(vault),
   ]);
   const gardenState = await garden(vault, kinPeople(kin), config, today);
   const woes = kinPeople(kin).filter((p) => p.woe != null).map((p) => ({ name: p.name, rhythm: p.woe, place: p.place }));
-  return { vaultName: VAULT_NAME, config, kin, inner, tending, thinking: { ...thinking, woes }, innerScreen, garden: gardenState, at: Date.now() };
+  return { vaultName: VAULT_NAME, config, kin, inner, tending, thinking: { ...thinking, woes }, innerScreen, embers, garden: gardenState, at: Date.now() };
 }
 
 export const kinPeople = (kin: Awaited<ReturnType<typeof kinState>>): Person[] =>

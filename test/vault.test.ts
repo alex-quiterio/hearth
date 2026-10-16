@@ -136,3 +136,19 @@ describe("inner screen", () => {
 test("wiki links open in Obsidian", () => {
   expect(md("see [[Ana Exemplo]]")).toContain('href="obsidian://open?vault=pandora&amp;file=Ana%20Exemplo"');
 });
+
+describe("embers", () => {
+  test("gathers dated entries from every log, oldest first", () => {
+    expect(new Set(s.embers.map((e) => e.kind))).toEqual(new Set(["moment", "practice", "spell", "tending"]));
+    expect(s.embers.map((e) => e.date)).toEqual([...s.embers.map((e) => e.date)].sort());
+  });
+
+  test("a tending entry is dated by its outcome when it has one", () => {
+    expect(s.embers.find((e) => e.title === "Carrying · Rui Teste")?.date).toBe("2026-10-07");
+    expect(s.embers.find((e) => e.title === "Growing · Sol Novo")?.date).toBe("2026-10-06");
+  });
+
+  test("the template placeholder is not an ember", () => {
+    expect(s.embers.some((e) => /YYYY/.test(e.date + e.title))).toBe(false);
+  });
+});
