@@ -37,6 +37,7 @@ async function load() {
     S = await res.json();
     G = S.garden ?? deriveGarden(S);
     $("#logout").hidden = $("#autoLock").hidden = !S.auth;
+    $("#shutdown").hidden = !S.local;
     showAutoLock();
     for (const n of watered) applyWater(n);
     render();

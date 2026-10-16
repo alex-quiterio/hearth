@@ -5,7 +5,7 @@ import { waterPlant } from "./garden";
 import { chat, answerPermission, stop, listModels } from "./agent";
 import { sessions, transcript, forget } from "./history";
 import { saveAttachment, vaultFile, sweepAttachments, type Attachment } from "./attach";
-import { loadAuth, authed, login, logout, AUTH_FILE } from "./auth";
+import { loadAuth, authed, login, logout, onThisMac, AUTH_FILE } from "./auth";
 import { menu } from "./menu";
 
 const vault = await findVault();
@@ -88,7 +88,7 @@ Bun.serve({
     "/favicon.ico": () => new Response(Bun.file(join(PUBLIC, "favicon.svg")), { headers: { "content-type": "image/svg+xml" } }),
     ...Object.fromEntries(APP_FILES.map((f) => [`/${f}`, () => new Response(Bun.file(join(PUBLIC, f)), APP_HEADERS[f])])),
 
-    "/api/state": async () => Response.json({ ...(await state(vault)), auth: hasPassword, lockAfter: LOCK_AFTER }),
+    "/api/state": async (req) => Response.json({ ...(await state(vault)), auth: hasPassword, lockAfter: LOCK_AFTER, local: onThisMac(req) }),
     "/api/menu": async () => Response.json(await menu()),
 
     "/api/events": (req) => {
@@ -180,7 +180,9 @@ Bun.serve({
     },
 
     "/api/shutdown": {
-      POST: () => {
+      // Only from the Mac itself: from the phone there is no Hearth.app to light it again.
+      POST: (req) => {
+        if (!onThisMac(req)) return Response.json({ error: "stop the server from the Mac" }, { status: 403 });
         console.log("stopped from the page");
         setTimeout(() => process.exit(0), 200);
         return Response.json({ ok: true });

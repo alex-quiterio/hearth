@@ -72,3 +72,8 @@ export async function login(req: Request): Promise<Response> {
 export const logout = (req: Request) => new Response(null, { status: 303, headers: { location: "/login", "set-cookie": cookie(req, "", 0) } });
 
 export const authEnabled = () => !!auth;
+
+// The server only listens on 127.0.0.1, so remote visits arrive through `tailscale serve`,
+// which always adds X-Forwarded-For (a client can add to it, never strip it) and Tailscale-User-Login.
+export const onThisMac = (req: Request) =>
+  !req.headers.has("x-forwarded-for") && !req.headers.has("tailscale-user-login") && ["127.0.0.1", "localhost"].includes(new URL(req.url).hostname);
