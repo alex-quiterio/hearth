@@ -265,8 +265,13 @@ button.name { cursor: pointer; } button.name:hover { color: var(--clay-ink); }
 .stamp { align-self: center; font-size: 11px; color: var(--muted); }
 .chat-input { border-top: 1px solid var(--line); padding: 12px 16px; display: grid; gap: 8px; }
 .chat-input textarea { width: 100%; resize: vertical; font: inherit; font-size: 14.5px; border: 1px solid var(--line); border-radius: 12px; padding: 9px 11px; background: var(--bg); color: var(--ink); }
-#autoAllow { font-size: 13px; padding-inline: 12px; white-space: nowrap; color: var(--muted); }
+#autoAllow { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding-inline: 12px; white-space: nowrap; color: var(--muted); }
+#autoAllow svg { flex: none; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
 #autoAllow[aria-pressed="true"] { color: var(--clay-ink); border-color: var(--clay); }
+#autoAllow[aria-pressed="true"] svg { fill: currentColor; }
+/* The composer can get narrow (a phone, or the pane dragged thin): auto-allow drops to its icon so Send / Queue always fits. */
+.chat-input { container-type: inline-size; }
+@container (max-width: 440px) { #autoAllow { padding-inline: 10px; } #autoAllow .label { display: none; } }
 .chat-buttons { display: flex; justify-content: flex-end; gap: 8px; }
 .chat-buttons .attach { margin-right: auto; padding-inline: 10px; }
 /* The model picker: a pill like the buttons beside it, with a drawn chevron instead of the OS one. */
@@ -287,6 +292,7 @@ button.name { cursor: pointer; } button.name:hover { color: var(--clay-ink); }
 .chat.dropping { outline: 2px dashed var(--moss); outline-offset: -6px; }
 .chat-buttons .primary, #send { background: var(--moss); color: #fff; border-color: var(--moss); }
 #send:disabled { opacity: .5; }
+#send { flex: none; white-space: nowrap; }
 
 /* the rail: the drawer folded to the side */
 .rail { display: none; }

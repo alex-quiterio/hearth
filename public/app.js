@@ -1232,7 +1232,8 @@ listen();
 let autoAllow = store.get("hearth.autoAllow") === "1";
 function showAutoAllow() {
   const b = $("#autoAllow");
-  b.textContent = autoAllow ? "Auto-allow on" : "Auto-allow off";
+  b.querySelector(".label").textContent = autoAllow ? "Auto-allow on" : "Auto-allow off";
+  b.setAttribute("aria-label", autoAllow ? "Auto-allow on" : "Auto-allow off");
   b.title = autoAllow
     ? "Your AI buddy runs every tool without asking (Beeper sends and changes still ask). Click to turn it off"
     : "Your AI buddy asks before tools outside the vault. Click to let it run them without asking";
