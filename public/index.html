@@ -60,7 +60,6 @@
         <strong>Conversation</strong>
         <span class="chat-status muted" id="chatStatus"></span>
         <div class="chat-tools">
-          <button class="ghost" id="autoAllow" aria-pressed="false"></button>
           <button class="ghost" id="historyBtn" title="Previous conversations" aria-expanded="false">History</button>
           <button class="ghost" id="newChat" title="Start a new conversation">New</button>
           <button class="ghost only-desktop" id="collapseChat" title="Fold to the side (\)" aria-label="Fold the conversation to the side">⇥</button>
@@ -77,6 +76,7 @@
         <div class="chat-buttons">
           <input type="file" id="file" multiple hidden>
           <button type="button" class="ghost attach" id="attach" title="Attach files (or drop them here, or paste an image)" aria-label="Attach files">📎</button>
+          <button type="button" class="ghost" id="autoAllow" aria-pressed="false"></button>
           <select id="model" title="Which Claude answers" aria-label="Model"><option value="">Default model</option></select>
           <button type="button" class="ghost" id="stop" hidden>Stop</button>
           <button type="submit" id="send">Send</button>

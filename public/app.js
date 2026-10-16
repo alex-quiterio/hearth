@@ -1065,7 +1065,9 @@ function handle(ev) {
       };
       $("[data-allow]", el).onclick = () => decide(true);
       $("[data-deny]", el).onclick = () => decide(false);
-      if (!ev.guarded) el.dataset.open = "";
+      // Only a card the server marked unguarded may be allowed for you; Beeper changes always wait.
+      if (ev.guarded === false) el.dataset.open = "";
+      if (ev.guarded === false && autoAllow) decide(true);
       renderWork();
       break;
     }
