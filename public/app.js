@@ -123,7 +123,7 @@ function render() {
     : "";
 
   $("#actions").innerHTML = config.actions
-    .map((a, i) => (/hearth/i.test(a.label) ? `<button class="tool gardener" data-action="${i}" title="${esc(a.hint ?? a.prompt)}">${esc(a.label)}</button>` : ""))
+    .map((a, i) => (/hearth/i.test(a.prompt) ? `<button class="tool gardener" data-action="${i}" title="${esc(a.hint ?? a.prompt)}">${esc(a.label)}</button>` : ""))
     .join("");
   if ($("#menu").open) renderMenu();
 
@@ -555,7 +555,7 @@ function skySection() {
 function nowSection() {
   const now = S.config.now ?? [];
   if (!now.length) return `<section class="panel now"><h2>Now</h2>
-    <p class="muted">Nothing named yet. <button class="tiny" data-run="/kin:hearth">Refresh hearth</button> reads what the skills wrote lately and fills this.</p></section>`;
+    <p class="muted">Nothing named yet. <button class="tiny" data-run="/kin:hearth">Refresh</button> reads what the skills wrote lately and fills this.</p></section>`;
   return `<section class="panel now"><h2>Now <button class="tiny ghost" data-run="/kin:hearth" title="Read what the skills wrote lately and refresh the dashboard">refresh</button></h2>
     <div class="now-list">${now.map((n) => {
       const left = daysUntil(n.until);
