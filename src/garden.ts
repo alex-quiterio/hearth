@@ -100,9 +100,9 @@ export function threadSections(text: string) {
     .filter((t): t is { date: string; state: "sent" | "draft" | null } => !!t.date);
 }
 
-/** Per person file: every thread date, and the latest thread that was actually sent. */
+/** Per person file: every thread date, the dates of the threads actually sent, and the latest of those. */
 async function threads(vault: string) {
-  const out = new Map<string, { dates: string[]; lastSent: string | null }>();
+  const out = new Map<string, { dates: string[]; sent: string[]; lastSent: string | null }>();
   const dir = join(vault, PATHS.conversations);
   let files: string[] = [];
   try {
@@ -113,7 +113,7 @@ async function threads(vault: string) {
   for (const f of files) {
     const ts = threadSections(await Bun.file(join(dir, f)).text());
     const sent = ts.filter((t) => t.state === "sent").map((t) => t.date).sort();
-    out.set(norm(f.replace(/\.md$/, "")), { dates: ts.map((t) => t.date), lastSent: sent.at(-1) ?? null });
+    out.set(norm(f.replace(/\.md$/, "")), { dates: ts.map((t) => t.date), sent, lastSent: sent.at(-1) ?? null });
   }
   return out;
 }
@@ -142,16 +142,19 @@ export async function garden(vault: string, people: Person[], config: Config, to
   const week = currentBlock(blocks, today);
   const convo = await threads(vault);
 
-  // Latest water per person, with where it came from.
+  // Latest water per person, with where it came from, and every day it fell for the record.
   const water = new Map<string, { date: string; from: Source }>();
+  const touches = new Map<string, Set<string>>();
   const offer = (name: string, date: string | null, from: Source) => {
     if (!date || date > today) return;
     const k = norm(name);
+    if (!touches.has(k)) touches.set(k, new Set());
+    touches.get(k)!.add(date);
     const prev = water.get(k);
     if (!prev || date > prev.date) water.set(k, { date, from });
   };
   for (const b of blocks) for (const e of b.entries) offer(e.name, tendedOn(e, b), e.kind === "Tended" ? "water" : "tending");
-  for (const [k, t] of convo) offer(k, t.lastSent, "thread");
+  for (const [k, t] of convo) for (const d of t.sent) offer(k, d, "thread");
   for (const p of people) offer(p.name, mapDate(p.note, today), "map");
 
   const byName = <T extends { name: string }>(list: T[]) => new Map(list.map((x) => [norm(x.name), x]));
