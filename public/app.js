@@ -1336,7 +1336,9 @@ async function openSession(id) {
   if (running) { toast("Your AI buddy is still working. Stop the turn first."); return; }
   if (id === sessionId) { showHistory(false); return; }
   if ($(".msg", $("#log")) && !confirm("Open this conversation? The one in the panel stays in History.")) return;
-  const lines = await (await fetch(`/api/sessions/${encodeURIComponent(id)}`)).json();
+  const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`);
+  const lines = res.ok ? await res.json() : null;
+  if (!Array.isArray(lines) || !lines.length) { toast("That conversation could not be read back."); return; }
   showHistory(false);
   sessionId = id;
   proposal = null;
@@ -1349,6 +1351,18 @@ async function openSession(id) {
   }
   $("#chatStatus").textContent = "continuing";
 }
+
+/* Locking leaves the page through the login form. This tab remembers which conversation was open (its id, never its text)
+   and opens it again after the password. A new tab starts fresh. */
+const OPEN_KEY = "hearth.openSession";
+addEventListener("pagehide", () => {
+  try { sessionId ? sessionStorage.setItem(OPEN_KEY, sessionId) : sessionStorage.removeItem(OPEN_KEY); } catch {}
+});
+(() => {
+  let id = null;
+  try { id = sessionStorage.getItem(OPEN_KEY); } catch {}
+  if (id) openSession(id).catch(() => {});
+})();
 
 $("#historyBtn").onclick = () => showHistory($("#history").hidden);
 showHistoryIcon(false);
