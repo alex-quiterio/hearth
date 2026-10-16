@@ -1120,7 +1120,7 @@ function renderWork() {
   $("#chatStatus").textContent = status;
   document.title = `${asking ? "◆ Approve" : "● " + workText} · ${BASE_TITLE}`;
   const fab = $("#openChat");
-  if (fab) fab.textContent = asking ? "Approve in Conversation" : `AI buddy is ${workText.toLowerCase()}…`;
+  if (fab) setFab(fab, asking ? "✋" : "💬", asking ? "Approve in Conversation" : `AI buddy is ${workText.toLowerCase()}…`);
 }
 function showWork() {
   if (!work) {
@@ -1135,6 +1135,8 @@ function showWork() {
   renderWork();
   scrollLog();
 }
+// The phone's conversation button is an emoji; what it means goes in its label. It glows while Claude works.
+function setFab(fab, emoji, label) { fab.textContent = emoji; fab.title = label; fab.setAttribute("aria-label", label); }
 function setActivity(text) { workText = text; renderWork(); }
 
 function setRunning(on, status = "") {
@@ -1150,7 +1152,7 @@ function setRunning(on, status = "") {
   } else {
     work?.remove(); work = null;
     document.title = BASE_TITLE;
-    const fab = $("#openChat"); if (fab) fab.textContent = "Conversation";
+    const fab = $("#openChat"); if (fab) setFab(fab, "💬", "Conversation");
     $("#chatStatus").textContent = status || (sessionId ? "listening" : "");
   }
   updateRailDot();

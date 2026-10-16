@@ -305,7 +305,7 @@ body.chat-collapsed .rail { display: flex; flex-direction: column; align-items: 
 @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent); transform: scale(1); } 50% { transform: scale(1.35); } }
 
 .only-mobile { display: none; }
-.chat-fab { position: fixed; right: 16px; bottom: 16px; background: var(--clay); color: #fff; border-color: var(--clay); box-shadow: var(--shadow); z-index: 20; }
+.chat-fab { position: fixed; right: 16px; bottom: 16px; width: 56px; height: 56px; padding: 0; border-radius: 50%; font-size: 26px; line-height: 1; justify-content: center; align-items: center; background: var(--clay); color: #fff; border-color: var(--clay); box-shadow: var(--shadow); z-index: 20; }
 
 @media (max-width: 900px) {
   .layout, body.chat-collapsed .layout { grid-template-columns: minmax(0, 1fr); }
