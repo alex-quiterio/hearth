@@ -55,6 +55,16 @@ pandora vault ──read──▶ hearth (Bun server) ──▶ browser dashboar
   change under `## Changes`. The "Tend the hearth" button asks Claude to reshape it on
   purpose.
 
+## Talk
+
+📊 Talk (`#talk`) counts direct messages from Beeper Desktop's local index, read only and never
+the text, fresh on every visit and each minute while open. It shows who you message most, a bell
+curve of how often (log scale), and **who is shifting**: warming (well above their usual month),
+cooling, gone quiet, and waiting on you (they wrote last). People are matched to the kin map, so a
+mother on Signal and on WhatsApp is one person and a tap opens her sheet. **Bring into the hearth**
+hands the shifts to `/kin:hearth`, which updates `pinned`, `watch` and Now in Hearth.md; Hearth
+itself still writes nothing. The tab hides when Beeper is not on the machine.
+
 ## Attachments
 
 Drop files on the chat, paste an image, or use 📎. The browser never reveals a file's path, so

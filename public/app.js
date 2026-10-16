@@ -427,6 +427,7 @@ function thinkingSection() {
 let talkDays = 90;
 let talkTimer = null;
 let T = null;
+let SH = null; // shifts: warming, cooling, quiet, waiting
 const DAY_MS = 86_400_000;
 const n0 = (n) => n.toLocaleString("en");
 const agoMs = (t) => { const d = Math.floor((Date.now() - t) / DAY_MS); return d <= 0 ? "today" : d === 1 ? "yesterday" : `${d} days ago`; };
@@ -439,15 +440,51 @@ async function loadTalk() {
 }
 async function fetchTalk() {
   try {
-    const res = await fetch(`/api/talk?days=${talkDays}`);
+    const [res, sh] = await Promise.all([fetch(`/api/talk?days=${talkDays}`), fetch("/api/shifts").catch(() => null)]);
     const t = await res.json();
     if (t.error) throw new Error(t.error);
     T = t;
+    const s = sh?.ok ? await sh.json() : null;
+    SH = s && !s.error ? s : null;
   } catch (e) {
     $("#talkScreen").innerHTML = `<section class="panel talk"><h2>Who I talk to</h2><p class="muted">${esc(e.message)}</p></section>`;
     return;
   }
   renderTalk();
+}
+
+// Who is shifting: this month against the usual month over the three before. People on the kin
+// map open their sheet; "Bring into the hearth" hands the shifts to /kin:hearth, which edits Hearth.md.
+const SHIFT = {
+  warming: { title: "Warming", hint: "a lot more than usual this month", line: (p) => `${p.recent} this month · usually ${Math.round(p.usual)}` },
+  cooling: { title: "Cooling", hint: "well under the usual", line: (p) => `${p.recent} this month · usually ${Math.round(p.usual)}` },
+  quiet: { title: "Gone quiet", hint: "had a rhythm, nothing this month", line: (p) => `usually ${Math.round(p.usual)} a month · last ${agoMs(Math.max(p.lastSent, p.lastReceived))}` },
+  waiting: { title: "Waiting on you", hint: "they wrote last", line: (p) => `wrote ${agoMs(p.lastReceived)}` },
+};
+function shiftsPrompt() {
+  const who = (key, p) => `${p.name}${p.ring ? ` (${p.ring})` : " (not on the kin map)"}: ${SHIFT[key].line(p)}`;
+  const parts = Object.keys(SHIFT).filter((key) => SH[key].length)
+    .map((key) => `${SHIFT[key].title}: ${SH[key].slice(0, 12).map((p) => who(key, p)).join("; ")}.`);
+  return `/kin:hearth Also weigh what Beeper shows, message counts only (the last 30 days against the usual month over the 90 days before):\n${parts.join("\n")}\nUse it as one more signal for pinned, watch and the Now list. For people not on the kin map who are warming, suggest kin:map rather than adding them.`;
+}
+function shiftsSection() {
+  if (!SH) return "";
+  const row = (key, p) => {
+    const name = p.ring ? `<button class="name" data-sheet="${esc(p.kin)}">${esc(p.name)}</button>` : `<span>${esc(p.name)}</span>`;
+    const reply = key === "waiting" ? `<button class="tiny ghost" data-run="${esc(`/beeper:thread-reply ${p.name}`)}" title="Draft a reply">Reply</button>` : "";
+    return `<li>${name}${p.ring ? `<span class="ring-tag">${esc(p.ring)}</span>` : ""}<small>${esc(SHIFT[key].line(p))}</small>${reply}</li>`;
+  };
+  const col = (key) => {
+    const list = SH[key];
+    const shown = list.slice(0, 6), more = list.slice(6);
+    return `<div class="shift"><h4>${SHIFT[key].title} <span class="count">${list.length}</span></h4><p class="muted">${SHIFT[key].hint}</p>
+      ${list.length ? `<ul>${shown.map((p) => row(key, p)).join("")}</ul>` : `<p class="muted">no one</p>`}
+      ${more.length ? `<details><summary>${more.length} more</summary><ul>${more.map((p) => row(key, p)).join("")}</ul></details>` : ""}</div>`;
+  };
+  return `<h3>Who is shifting <span class="sub">this month against the usual month</span></h3>
+    <div class="shifts">${Object.keys(SHIFT).map(col).join("")}</div>
+    <div class="shift-bar"><button class="tool gardener" data-run="${esc(shiftsPrompt())}" title="Ask /kin:hearth to update pinned, watch and Now from these shifts">Bring into the hearth</button>
+    <span class="muted">Kin map people first; tap one to open them.</span></div>`;
 }
 
 function renderTalk() {
@@ -466,7 +503,10 @@ function renderTalk() {
     .map(([b, s]) => `<div class="talk-tile"><b>${b}</b><span>${s}</span></div>`).join("");
 
   // The curve: histogram, fitted Gaussian, ±1σ/±2σ bands, then a dot per person below.
-  const W = 1000, L = 20, R = 20, top = 20, base = 220, bw = 0.2, r = 5, step = 2 * r + 1.5;
+  // Drawn at the panel's real width, so text stays 12px on a phone instead of shrinking with the chart.
+  const W = Math.round(Math.min(1000, Math.max(300, ($("#talkScreen").clientWidth || 1000) - 42)));
+  const narrow = W < 560;
+  const L = 12, R = 12, top = 20, base = narrow ? 170 : 220, bw = 0.2, r = narrow ? 4 : 5, step = 2 * r + 1.5;
   const minX = -0.05, maxX = Math.max(xs[0], mu + 2.5 * sd) + 0.15;
   const X = (v) => L + ((v - minX) / (maxX - minX)) * (W - L - R);
   const bins = Array.from({ length: Math.ceil(maxX / bw) }, () => 0);
@@ -487,7 +527,7 @@ function renderTalk() {
   for (let v = minX; v <= maxX; v += 0.02) d += `${d ? "L" : "M"}${X(v).toFixed(1)},${Y(pdf(v)).toFixed(1)}`;
   g += `<path d="${d}" class="curve"/>`;
   g += `<line x1="${X(mu)}" x2="${X(mu)}" y1="${top}" y2="${base}" class="mu"/><text x="${X(mu) + 6}" y="${top + 12}" class="ink">typical ≈ ${Math.round(10 ** mu)}</text>`;
-  [-1, 1, 2].forEach((k) => { const v = mu + k * sd; if (v > minX && v < maxX) g += `<text x="${X(v)}" y="${top + 28}" text-anchor="middle">${k > 0 ? "+" : ""}${k}σ · ${Math.round(10 ** v)}</text>`; });
+  (narrow ? [1, 2] : [-1, 1, 2]).forEach((k) => { const v = mu + k * sd; if (v > minX && v < maxX) g += `<text x="${X(v)}" y="${top + 28}" text-anchor="middle">${k > 0 ? "+" : ""}${k}σ · ${Math.round(10 ** v)}</text>`; });
   g += `<line x1="${L}" x2="${W - R}" y1="${base}" y2="${base}" class="axis"/><text x="${L}" y="${base + 38}">messages exchanged →</text>`;
   const dots = [];
   [...P].reverse().forEach((p) => {
@@ -503,27 +543,28 @@ function renderTalk() {
   const far = P.filter((p) => z(p) > 2);
 
   // Most frequent: sent and received side by side, with how long since the last message.
-  const top20 = P.slice(0, 20), bh = 22, gap = 8, LW = 210, BW = W - LW - 150, bmax = P[0].total;
+  const top20 = P.slice(0, 20), bh = 22, gap = 8, LW = narrow ? 110 : 210, BW = W - LW - (narrow ? 100 : 150), bmax = P[0].total, cut = narrow ? 14 : 26;
   const bars = top20.map((p, i) => {
     const y = i * (bh + gap), ws = (p.sent / bmax) * BW, wr = (p.received / bmax) * BW;
     return `<g data-talk="${i}" class="row"><rect x="0" y="${y - 3}" width="${W}" height="${bh + 6}" class="hit"/>
-      <text x="${LW - 10}" y="${y + 15}" text-anchor="end" class="ink">${esc(p.name.length > 26 ? p.name.slice(0, 25) + "…" : p.name)}</text>
+      <text x="${LW - 10}" y="${y + 15}" text-anchor="end" class="ink">${esc(p.name.length > cut ? p.name.slice(0, cut - 1) + "…" : p.name)}</text>
       ${ws > 0 ? `<rect x="${LW}" y="${y}" width="${Math.max(ws - 1, 1)}" height="${bh}" rx="2" class="sent"/>` : ""}
       ${wr > 0 ? `<rect x="${LW + ws + (ws > 0 ? 1 : 0)}" y="${y}" width="${Math.max(wr - 1, 1)}" height="${bh}" rx="2" class="received"/>` : ""}
-      <text x="${LW + ws + wr + 8}" y="${y + 15}">${n0(p.total)} · ${agoMs(p.last)}</text></g>`;
+      <text x="${LW + ws + wr + 6}" y="${y + 15}">${n0(p.total)}${narrow ? "" : ` · ${agoMs(p.last)}`}</text></g>`;
   }).join("");
   const rows = P.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.name)}</td><td>${esc(p.nets.join(", "))}</td><td class="n">${p.sent}</td><td class="n">${p.received}</td><td class="n">${p.total}</td><td class="n">${z(p).toFixed(1)}</td><td>${agoMs(p.last)}</td></tr>`).join("");
 
   $("#talkScreen").innerHTML = `<section class="panel talk">${head}
     <div class="talk-tiles">${tiles}</div>
+    ${shiftsSection()}
     <h3>The bell curve</h3>
     <p class="muted">One dot per person, placed by messages exchanged in the last ${talkDays === 7 ? "week" : talkDays === 365 ? "year" : `${talkDays} days`}. Log scale, so each step is ×10; the curve is the fitted Gaussian, the bands ±1σ and ±2σ.</p>
     <div class="talk-legend"><span><i class="dot"></i>in the last 14 days</span><span><i class="dot quiet"></i>quiet for 14+ days</span></div>
-    <svg class="talk-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Distribution of messages per person">${g}</svg>
+    <svg class="talk-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Distribution of messages per person">${g}</svg>
     ${far.length ? `<p class="muted">Past +2σ, further out than the curve expects: ${far.map((p) => esc(p.name)).join(", ")}.</p>` : ""}
     <h3>Most frequent</h3>
     <div class="talk-legend"><span><i class="sent"></i>sent by me</span><span><i class="received"></i>received</span></div>
-    <svg class="talk-svg" viewBox="0 0 ${W} ${top20.length * (bh + gap)}" role="img" aria-label="Top 20 people by messages">${bars}</svg>
+    <svg class="talk-svg" viewBox="0 0 ${W} ${top20.length * (bh + gap)}" width="${W}" height="${top20.length * (bh + gap)}" role="img" aria-label="Top 20 people by messages">${bars}</svg>
     <details><summary>Everyone, as a table</summary><table class="talk-table"><tr><th>#</th><th>Person</th><th>Where</th><th class="n">Sent</th><th class="n">Received</th><th class="n">Total</th><th class="n">σ</th><th>Last</th></tr>${rows}</table></details>
   </section>`;
 }
@@ -533,16 +574,22 @@ $("#talkScreen").addEventListener("click", (e) => {
   if (d) { talkDays = Number(d.dataset.talkDays); loadTalk(); }
   if (e.target.closest("[data-talk-refresh]")) fetchTalk();
 });
-$("#talkScreen").addEventListener("mousemove", (e) => {
+// The card for a dot or a bar, under the pointer or finger, kept inside the screen.
+function showTalkTip(e) {
   const h = e.target.closest("[data-talk]"), tip = talkTip();
   if (!h || !T) { tip.hidden = true; return; }
   const p = T.people[Number(h.dataset.talk)];
   tip.innerHTML = `<strong>${esc(p.name)}</strong><br>${n0(p.total)} messages (${p.sent} sent · ${p.received} received)<br>last ${agoMs(p.last)} · ${esc(p.nets.join(", "))}`;
   tip.hidden = false;
-  tip.style.left = `${Math.min(e.clientX + 14, innerWidth - 260)}px`;
-  tip.style.top = `${e.clientY + 14}px`;
-});
+  tip.style.left = `${Math.max(8, Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8))}px`;
+  tip.style.top = `${e.clientY + 14 + tip.offsetHeight > innerHeight ? e.clientY - tip.offsetHeight - 14 : e.clientY + 14}px`;
+}
+$("#talkScreen").addEventListener("mousemove", showTalkTip);
 $("#talkScreen").addEventListener("mouseleave", () => { talkTip().hidden = true; });
+// Phones have no hover: a tap on a dot or a bar shows the same card, a tap elsewhere hides it.
+$("#talkScreen").addEventListener("pointerup", (e) => { if (e.pointerType !== "mouse") showTalkTip(e); });
+let talkResize;
+window.addEventListener("resize", () => { clearTimeout(talkResize); talkResize = setTimeout(() => screen() === "talk" && T && renderTalk(), 200); });
 // Its own tooltip: the kin one lives inside the hidden kin screen.
 function talkTip() {
   let t = $("#talkTip");

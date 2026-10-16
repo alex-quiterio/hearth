@@ -7,7 +7,7 @@ import { sessions, transcript, forget } from "./history";
 import { saveAttachment, vaultFile, sweepAttachments, type Attachment } from "./attach";
 import { loadAuth, authed, login, logout, onThisMac, AUTH_FILE } from "./auth";
 import { menu } from "./menu";
-import { talk, beeperOn } from "./beeper";
+import { talk, beeperOn, shifts } from "./beeper";
 
 const vault = await findVault();
 const PORT = Number(process.env.HEARTH_PORT ?? 4747);
@@ -104,6 +104,13 @@ Bun.serve({
       const days = Math.min(3650, Math.max(1, Number(new URL(req.url).searchParams.get("days")) || 90));
       const t = talk(days);
       return Response.json(t, { status: "error" in t ? 503 : 200 });
+    },
+    // Who is warming, cooling, gone quiet or waiting on a reply, matched against the kin map.
+    "/api/shifts": async () => {
+      if (!beeperOn()) return Response.json({ error: "Beeper is off on this machine" }, { status: 404 });
+      const kin = kinPeople(await kinState(vault)).map((p) => ({ name: p.name, ring: p.ring }));
+      const s = shifts(kin);
+      return Response.json(s, { status: "error" in s ? 503 : 200 });
     },
 
     "/api/events": (req) => {

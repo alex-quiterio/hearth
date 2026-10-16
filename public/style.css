@@ -537,3 +537,38 @@ button.build:hover { border-color: var(--muted); }
 .talk details { margin-top: 14px; }
 .talk details summary { cursor: pointer; color: var(--ink-2); }
 @media (max-width: 640px) { .talk-table th:nth-child(3), .talk-table td:nth-child(3) { display: none; } }
+
+/* talk: who is shifting */
+.talk h3 .sub { font: 500 13px Inter, sans-serif; color: var(--muted); margin-left: 6px; }
+.shifts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-top: 8px; }
+.shift { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; min-width: 0; }
+.shift h4 { margin: 0; font: 600 15px Fraunces, Georgia, serif; display: flex; align-items: center; gap: 8px; }
+.shift h4 .count { font: 600 12px Inter, sans-serif; color: var(--ink-2); background: var(--surface-2); border-radius: 999px; padding: 1px 8px; }
+.shift > p { margin: 2px 0 8px; font-size: 13px; }
+.shift ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.shift li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 14px; }
+.shift li small { flex-basis: 100%; color: var(--muted); font-size: 12.5px; }
+.shift li button.name { border: 0; padding: 0; background: none; font: inherit; font-weight: 600; color: var(--ink); }
+.shift li > span:first-child { font-weight: 600; }
+.shift .ring-tag { font-size: 11px; text-transform: lowercase; color: var(--ink-2); background: var(--surface-2); border-radius: 999px; padding: 0 7px; }
+.shift li .tiny { margin-left: auto; }
+.shift details { margin-top: 6px; } .shift details ul { margin-top: 6px; }
+.shift-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; font-size: 13px; }
+
+/* talk on a phone */
+@media (max-width: 640px) {
+  .talk { padding: 14px 12px; }
+  .talk-bar { gap: 6px; }
+  .talk-days { flex: 1; overflow-x: auto; scrollbar-width: none; }
+  .talk-days button, .talk-bar > button { padding: 5px 11px; font-size: 13px; white-space: nowrap; }
+  .talk-tiles { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .talk-tile { padding: 8px 12px; }
+  .talk-tile b { font-size: 20px; }
+  .talk h3 .sub { display: block; margin: 2px 0 0; }
+  .shifts { grid-template-columns: 1fr; }
+  .shift li .tiny { padding: 4px 12px; }
+  .talk-table th:nth-child(7), .talk-table td:nth-child(7) { display: none; }
+  .talk-table th, .talk-table td { padding: 5px 4px; }
+  .talk-tip { max-width: calc(100vw - 16px); }
+}
+.talk-svg circle.hit, .talk-svg .row { cursor: pointer; -webkit-tap-highlight-color: transparent; }

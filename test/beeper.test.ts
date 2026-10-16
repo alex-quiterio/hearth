@@ -3,7 +3,7 @@ import { Database } from "bun:sqlite";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { talk, beeperOn } from "../src/beeper";
+import { talk, beeperOn, shifts } from "../src/beeper";
 
 // A tiny Beeper index with just the columns talk() reads.
 function fixture() {
@@ -60,4 +60,31 @@ test("Beeper is off when its index is missing or HEARTH_BEEPER=off", () => {
   } finally {
     delete process.env.HEARTH_BEEPER;
   }
+});
+
+test("shifts: warming, cooling, quiet and waiting, matched and merged with the kin map", () => {
+  const file = join(mkdtempSync(join(tmpdir(), "beeper-")), "index.db");
+  const db = new Database(file);
+  db.run(`create table threads (threadID text primary key, accountID text, thread json)`);
+  db.run(`create table participants (account_id text, room_id text, id text, full_name text, nickname text, is_self int, is_network_bot int)`);
+  db.run(`create table mx_room_messages (roomID text, timestamp int, isDeleted int, type text, isSentByMe int)`);
+  const room = (id: string, name: string, account = "whatsapp.1") => {
+    db.run(`insert into threads values (?, ?, ?)`, [id, account, JSON.stringify({ type: "single" })]);
+    db.run(`insert into participants values (?, ?, ?, ?, null, 0, 0)`, [account, id, `@${id}`, name]);
+  };
+  const msgs = (room: string, n: number, daysAgo: number, me = 0) => {
+    for (let i = 0; i < n; i++) db.run(`insert into mx_room_messages values (?, ?, 0, 'TEXT', ?)`, [room, NOW - daysAgo * 86_400_000 - i * 1000, me]);
+  };
+  room("w", "Nova Reyes"); msgs("w", 20, 2, 1); msgs("w", 3, 60);        // 20 now, 1 a month before: warming
+  room("c", "Ola Brandt"); msgs("c", 2, 5, 1); msgs("c", 30, 50);        // 2 now, 10 a month before: cooling
+  room("q", "Ivo Marsh"); msgs("q", 15, 70, 1);                          // nothing now, 5 a month before: quiet
+  room("a", "Mira Solis", "signal.1"); msgs("a", 1, 10, 1); msgs("a", 1, 3);       // she wrote last, 3 days ago
+  room("b", "Mira ~ Mãe Solis", "whatsapp.1"); msgs("b", 1, 4);                   // same person on WhatsApp
+  db.close();
+  const s = shifts([{ name: "Mira Solis", ring: "core" }, { name: "Ivo", ring: "close" }], file, NOW);
+  if ("error" in s) throw new Error(s.error);
+  expect(s.warming.map((p) => p.name)).toEqual(["Nova Reyes"]);
+  expect(s.cooling.map((p) => p.name)).toEqual(["Ola Brandt"]);
+  expect(s.quiet.map((p) => [p.name, p.ring])).toEqual([["Ivo", "close"]]);
+  expect(s.waiting.map((p) => [p.name, p.ring, p.nets])).toEqual([["Mira Solis", "core", ["signal", "whatsapp"]]]);
 });
