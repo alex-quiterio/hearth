@@ -110,6 +110,8 @@ Copy `.env.example` to `.env` (Bun loads it on its own; `.env` is git-ignored).
 | `HEARTH_PRACTICE_DIR` | `4 - Archive/practice`: Emergent practice, Spells |
 | `HEARTH_PROJECTS_DIR` | `4 - Archive/projects`: Coordination partner |
 | `HEARTH_ROUGH_DIR` | `1 - Rough Notes` |
+| `HEARTH_BEEPER` | on: set `off` to hide the 📊 Talk screen. It also hides itself when Beeper's index is not on this machine |
+| `HEARTH_BEEPER_DB` | `~/Library/Application Support/BeeperTexts/index.db`: Beeper Desktop's local index, read only |
 | `HEARTH_PLUGINS_DIR` | `~/code/alex-quiterio/buchecha/plugins`: where the menu reads the skills |
 | `HEARTH_AUTH_FILE` | `~/.config/hearth/auth.json`: the password hash and cookie secret |
 | `ANTHROPIC_API_KEY` | unset: runs on your Claude Code login. Set, every turn bills that API key |

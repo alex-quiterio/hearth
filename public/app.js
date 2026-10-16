@@ -414,14 +414,148 @@ function thinkingSection() {
     </div></section>`;
 }
 
+/* ---------- talk: who Alex talks to, live from Beeper ---------- */
+
+// Messages per person are heavy-tailed, so the bell curve is fitted on a log scale:
+// each step on the axis is ×10. Refetched every minute while the screen is open.
+let talkDays = 90;
+let talkTimer = null;
+let T = null;
+const DAY_MS = 86_400_000;
+const n0 = (n) => n.toLocaleString("en");
+const agoMs = (t) => { const d = Math.floor((Date.now() - t) / DAY_MS); return d <= 0 ? "today" : d === 1 ? "yesterday" : `${d} days ago`; };
+
+async function loadTalk() {
+  clearInterval(talkTimer);
+  talkTimer = setInterval(() => screen() === "talk" && !document.hidden && fetchTalk(), 60_000);
+  if (!T || T.days !== talkDays) $("#talkScreen").innerHTML = `<section class="panel talk"><p class="muted">Counting…</p></section>`;
+  await fetchTalk();
+}
+async function fetchTalk() {
+  try {
+    const res = await fetch(`/api/talk?days=${talkDays}`);
+    const t = await res.json();
+    if (t.error) throw new Error(t.error);
+    T = t;
+  } catch (e) {
+    $("#talkScreen").innerHTML = `<section class="panel talk"><h2>Who I talk to</h2><p class="muted">${esc(e.message)}</p></section>`;
+    return;
+  }
+  renderTalk();
+}
+
+function renderTalk() {
+  const P = T.people, N = P.length;
+  const head = `<h2>Who I talk to <span class="sub">direct chats on Beeper · updated ${new Date(T.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></h2>
+    <div class="talk-bar"><div class="talk-days" role="group" aria-label="Time window">${[7, 30, 90, 365].map((d) => `<button class="ghost" data-talk-days="${d}" aria-pressed="${d === talkDays}">${d === 7 ? "Last week" : d === 365 ? "1 year" : `${d} days`}</button>`).join("")}</div>
+    <button class="ghost" data-talk-refresh title="Count again from Beeper">↻ Refresh</button></div>`;
+  if (!N) { $("#talkScreen").innerHTML = `<section class="panel talk">${head}<p class="muted">No direct messages in this window.</p></section>`; return; }
+  const total = P.reduce((a, p) => a + p.total, 0);
+  const xs = P.map((p) => Math.log10(p.total));
+  const mu = xs.reduce((a, b) => a + b, 0) / N;
+  const sd = Math.sqrt(xs.reduce((a, b) => a + (b - mu) ** 2, 0) / N) || 0.3;
+  const z = (p) => (Math.log10(p.total) - mu) / sd;
+  const top5 = P.slice(0, 5).reduce((a, p) => a + p.total, 0);
+  const tiles = [[N, "people"], [n0(total), "messages"], [P[Math.floor(N / 2)].total, "with the median person"], [`${Math.round((top5 / total) * 100)}%`, "go to the top 5"]]
+    .map(([b, s]) => `<div class="talk-tile"><b>${b}</b><span>${s}</span></div>`).join("");
+
+  // The curve: histogram, fitted Gaussian, ±1σ/±2σ bands, then a dot per person below.
+  const W = 1000, L = 20, R = 20, top = 20, base = 220, bw = 0.2, r = 5, step = 2 * r + 1.5;
+  const minX = -0.05, maxX = Math.max(xs[0], mu + 2.5 * sd) + 0.15;
+  const X = (v) => L + ((v - minX) / (maxX - minX)) * (W - L - R);
+  const bins = Array.from({ length: Math.ceil(maxX / bw) }, () => 0);
+  xs.forEach((v) => bins[Math.min(bins.length - 1, Math.floor(v / bw))]++);
+  const pdf = (v) => (Math.exp(-((v - mu) ** 2) / (2 * sd * sd)) / (sd * Math.sqrt(2 * Math.PI))) * N * bw;
+  const ymax = Math.max(...bins, pdf(mu)) * 1.1, Y = (c) => base - (c / ymax) * (base - top);
+  let g = [2, 1].map((k) => `<rect x="${X(mu - k * sd)}" y="${top}" width="${X(mu + k * sd) - X(mu - k * sd)}" height="${base - top}" class="band"/>`).join("");
+  for (let e = 0; e <= maxX; e++) {
+    g += `<line x1="${X(e)}" x2="${X(e)}" y1="${top}" y2="${base}" class="grid"/><text x="${X(e)}" y="${base + 18}" text-anchor="middle">${n0(10 ** e)}</text>`;
+    for (const m of [2, 5]) if (e + Math.log10(m) < maxX) g += `<line x1="${X(e + Math.log10(m))}" x2="${X(e + Math.log10(m))}" y1="${base}" y2="${base + 5}" class="axis"/>`;
+  }
+  bins.forEach((c, i) => {
+    if (!c) return;
+    const x = X(i * bw) + 1, w = X((i + 1) * bw) - X(i * bw) - 2, y = Y(c);
+    g += `<path d="M${x},${base}V${y + 4}q0,-4 4,-4h${w - 8}q4,0 4,4V${base}Z" class="bin"/>`;
+  });
+  let d = "";
+  for (let v = minX; v <= maxX; v += 0.02) d += `${d ? "L" : "M"}${X(v).toFixed(1)},${Y(pdf(v)).toFixed(1)}`;
+  g += `<path d="${d}" class="curve"/>`;
+  g += `<line x1="${X(mu)}" x2="${X(mu)}" y1="${top}" y2="${base}" class="mu"/><text x="${X(mu) + 6}" y="${top + 12}" class="ink">typical ≈ ${Math.round(10 ** mu)}</text>`;
+  [-1, 1, 2].forEach((k) => { const v = mu + k * sd; if (v > minX && v < maxX) g += `<text x="${X(v)}" y="${top + 28}" text-anchor="middle">${k > 0 ? "+" : ""}${k}σ · ${Math.round(10 ** v)}</text>`; });
+  g += `<line x1="${L}" x2="${W - R}" y1="${base}" y2="${base}" class="axis"/><text x="${L}" y="${base + 38}">messages exchanged →</text>`;
+  const dots = [];
+  [...P].reverse().forEach((p) => {
+    const x = X(Math.log10(p.total));
+    let k = 0;
+    while (dots.some((o) => o.k === k && Math.abs(o.x - x) < step)) k++;
+    dots.push({ x, k, p, cy: base + 58 + k * step });
+  });
+  const H = base + 58 + (Math.max(...dots.map((o) => o.k)) + 1) * step + 16;
+  dots.forEach((o) => { g += `<circle cx="${o.x}" cy="${o.cy}" r="${r}" class="${Date.now() - o.p.last < 14 * DAY_MS ? "dot" : "dot quiet"}"/>`; });
+  P.slice(0, 5).forEach((p, i) => { const o = dots.find((o) => o.p === p); g += `<text x="${o.x}" y="${o.cy - r - 6 - (i % 2) * 14}" text-anchor="middle" class="ink">${esc(p.name.split(" ")[0])}</text>`; });
+  dots.forEach((o) => { g += `<circle cx="${o.x}" cy="${o.cy}" r="${r + 4}" class="hit" data-talk="${P.indexOf(o.p)}"/>`; });
+  const far = P.filter((p) => z(p) > 2);
+
+  // Most frequent: sent and received side by side, with how long since the last message.
+  const top20 = P.slice(0, 20), bh = 22, gap = 8, LW = 210, BW = W - LW - 150, bmax = P[0].total;
+  const bars = top20.map((p, i) => {
+    const y = i * (bh + gap), ws = (p.sent / bmax) * BW, wr = (p.received / bmax) * BW;
+    return `<g data-talk="${i}" class="row"><rect x="0" y="${y - 3}" width="${W}" height="${bh + 6}" class="hit"/>
+      <text x="${LW - 10}" y="${y + 15}" text-anchor="end" class="ink">${esc(p.name.length > 26 ? p.name.slice(0, 25) + "…" : p.name)}</text>
+      ${ws > 0 ? `<rect x="${LW}" y="${y}" width="${Math.max(ws - 1, 1)}" height="${bh}" rx="2" class="sent"/>` : ""}
+      ${wr > 0 ? `<rect x="${LW + ws + (ws > 0 ? 1 : 0)}" y="${y}" width="${Math.max(wr - 1, 1)}" height="${bh}" rx="2" class="received"/>` : ""}
+      <text x="${LW + ws + wr + 8}" y="${y + 15}">${n0(p.total)} · ${agoMs(p.last)}</text></g>`;
+  }).join("");
+  const rows = P.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.name)}</td><td>${esc(p.nets.join(", "))}</td><td class="n">${p.sent}</td><td class="n">${p.received}</td><td class="n">${p.total}</td><td class="n">${z(p).toFixed(1)}</td><td>${agoMs(p.last)}</td></tr>`).join("");
+
+  $("#talkScreen").innerHTML = `<section class="panel talk">${head}
+    <div class="talk-tiles">${tiles}</div>
+    <h3>The bell curve</h3>
+    <p class="muted">One dot per person, placed by messages exchanged in the last ${talkDays === 7 ? "week" : talkDays === 365 ? "year" : `${talkDays} days`}. Log scale, so each step is ×10; the curve is the fitted Gaussian, the bands ±1σ and ±2σ.</p>
+    <div class="talk-legend"><span><i class="dot"></i>in the last 14 days</span><span><i class="dot quiet"></i>quiet for 14+ days</span></div>
+    <svg class="talk-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Distribution of messages per person">${g}</svg>
+    ${far.length ? `<p class="muted">Past +2σ, further out than the curve expects: ${far.map((p) => esc(p.name)).join(", ")}.</p>` : ""}
+    <h3>Most frequent</h3>
+    <div class="talk-legend"><span><i class="sent"></i>sent by me</span><span><i class="received"></i>received</span></div>
+    <svg class="talk-svg" viewBox="0 0 ${W} ${top20.length * (bh + gap)}" role="img" aria-label="Top 20 people by messages">${bars}</svg>
+    <details><summary>Everyone, as a table</summary><table class="talk-table"><tr><th>#</th><th>Person</th><th>Where</th><th class="n">Sent</th><th class="n">Received</th><th class="n">Total</th><th class="n">σ</th><th>Last</th></tr>${rows}</table></details>
+  </section>`;
+}
+
+$("#talkScreen").addEventListener("click", (e) => {
+  const d = e.target.closest("[data-talk-days]");
+  if (d) { talkDays = Number(d.dataset.talkDays); loadTalk(); }
+  if (e.target.closest("[data-talk-refresh]")) fetchTalk();
+});
+$("#talkScreen").addEventListener("mousemove", (e) => {
+  const h = e.target.closest("[data-talk]"), tip = talkTip();
+  if (!h || !T) { tip.hidden = true; return; }
+  const p = T.people[Number(h.dataset.talk)];
+  tip.innerHTML = `<strong>${esc(p.name)}</strong><br>${n0(p.total)} messages (${p.sent} sent · ${p.received} received)<br>last ${agoMs(p.last)} · ${esc(p.nets.join(", "))}`;
+  tip.hidden = false;
+  tip.style.left = `${Math.min(e.clientX + 14, innerWidth - 260)}px`;
+  tip.style.top = `${e.clientY + 14}px`;
+});
+$("#talkScreen").addEventListener("mouseleave", () => { talkTip().hidden = true; });
+// Its own tooltip: the kin one lives inside the hidden kin screen.
+function talkTip() {
+  let t = $("#talkTip");
+  if (!t) { t = Object.assign(document.createElement("div"), { id: "talkTip", className: "tip talk-tip", hidden: true }); document.body.append(t); }
+  return t;
+}
+
 /* ---------- screens ---------- */
 
-// Inner is the first screen; the kin garden is #kin.
-const screen = () => (location.hash === "#kin" ? "kin" : "inner");
+// Inner is the first screen; the kin garden is #kin; who Alex talks to is #talk.
+// Talk needs Beeper on this machine; without it the tab goes away and #talk falls back to Inner.
+const screen = () => (location.hash === "#kin" ? "kin" : location.hash === "#talk" && S?.beeper ? "talk" : "inner");
 function showScreen() {
   const s = screen();
+  $('[data-screen="talk"]').hidden = !S?.beeper;
   $("#kinScreen").hidden = s !== "kin";
   $("#innerScreen").hidden = s !== "inner";
+  $("#talkScreen").hidden = s !== "talk";
+  if (s === "talk") loadTalk(); else clearInterval(talkTimer);
   document.body.dataset.screen = s;
   document.querySelectorAll("[data-screen]").forEach((a) => a.setAttribute("aria-current", a.dataset.screen === s ? "page" : "false"));
 }

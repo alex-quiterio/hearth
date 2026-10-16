@@ -266,6 +266,7 @@ button.name { cursor: pointer; } button.name:hover { color: var(--clay-ink); }
 .chat-input { border-top: 1px solid var(--line); padding: 12px 16px; display: grid; gap: 8px; }
 .chat-input textarea { width: 100%; resize: vertical; font: inherit; font-size: 14.5px; border: 1px solid var(--line); border-radius: 12px; padding: 9px 11px; background: var(--bg); color: var(--ink); }
 #autoAllow { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding-inline: 12px; white-space: nowrap; color: var(--muted); }
+#autoAllow .label { margin: 0; color: inherit; line-height: 1; } /* not the section .label: no margins, same ink as the bolt */
 #autoAllow svg { flex: none; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
 #autoAllow[aria-pressed="true"] { color: var(--clay-ink); border-color: var(--clay); }
 #autoAllow[aria-pressed="true"] svg { fill: currentColor; }
@@ -417,7 +418,7 @@ body.chat-collapsed .chat-resize { display: none; }
 .screens a { padding: 4px 14px; border-radius: 999px; color: var(--ink-2); text-decoration: none; font-size: 13.5px; font-weight: 500; }
 .screens a[aria-current="page"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
 #innerScreen { display: grid; gap: 16px; margin-top: 18px; }
-#innerScreen[hidden] { display: none; }
+#innerScreen[hidden], #talkScreen[hidden], .screens a[hidden] { display: none; }
 #innerScreen .inner-cols { align-items: start; }
 #innerScreen .inner-cols:empty { display: none; }
 .inner-launch .menu-icon { font-size: 16px; }
@@ -483,3 +484,40 @@ body.chat-collapsed .chat-resize { display: none; }
 }
 .build::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--clay); box-shadow: 0 0 6px var(--clay); }
 .build span { font-family: Fraunces, Georgia, serif; font-weight: 600; letter-spacing: 0; color: var(--ink); }
+
+/* talk: who Alex talks to */
+.talk h3 { font-size: 17px; margin-top: 22px; }
+.talk-bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; margin-bottom: 14px; }
+.talk-days { display: inline-flex; gap: 4px; }
+.talk-days button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.talk-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.talk-tile { background: var(--surface-2); border-radius: 12px; padding: 10px 14px; }
+.talk-tile b { display: block; font: 600 24px Fraunces, Georgia, serif; font-variant-numeric: tabular-nums; }
+.talk-tile span { color: var(--ink-2); font-size: 13px; }
+.talk-legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--ink-2); margin: 6px 0; }
+.talk-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+.talk-legend i.dot, .talk-legend i.sent { background: var(--water); }
+.talk-legend i.quiet { background: transparent; border: 2px solid var(--water); }
+.talk-legend i.received { background: var(--clay); }
+.talk-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.talk-svg text { font: 12px Inter, system-ui, sans-serif; fill: var(--muted); }
+.talk-svg text.ink { fill: var(--ink); }
+.talk-svg .band { fill: color-mix(in srgb, var(--water) 8%, transparent); }
+.talk-svg .grid { stroke: var(--line); }
+.talk-svg .axis { stroke: var(--muted); }
+.talk-svg .bin { fill: var(--water); opacity: .2; }
+.talk-svg .curve { fill: none; stroke: var(--water); stroke-width: 2; }
+.talk-svg .mu { stroke: var(--ink-2); stroke-dasharray: 3 3; }
+.talk-svg .dot { fill: var(--water); stroke: var(--surface); stroke-width: 1.5; }
+.talk-svg .dot.quiet { fill: var(--surface); stroke: var(--water); }
+.talk-svg .hit { fill: transparent; }
+.talk-svg .sent { fill: var(--water); }
+.talk-svg .received { fill: var(--clay); }
+.talk-svg .row:hover .hit { fill: var(--surface-2); }
+.talk-tip { position: fixed; transform: none; }
+.talk-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.talk-table th, .talk-table td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); }
+.talk-table .n { text-align: right; }
+.talk details { margin-top: 14px; }
+.talk details summary { cursor: pointer; color: var(--ink-2); }
+@media (max-width: 640px) { .talk-table th:nth-child(3), .talk-table td:nth-child(3) { display: none; } }

@@ -7,6 +7,7 @@ import { sessions, transcript, forget } from "./history";
 import { saveAttachment, vaultFile, sweepAttachments, type Attachment } from "./attach";
 import { loadAuth, authed, login, logout, onThisMac, AUTH_FILE } from "./auth";
 import { menu } from "./menu";
+import { talk, beeperOn } from "./beeper";
 
 const vault = await findVault();
 const PORT = Number(process.env.HEARTH_PORT ?? 4747);
@@ -95,8 +96,15 @@ Bun.serve({
     "/favicon.ico": () => new Response(Bun.file(join(PUBLIC, "favicon.svg")), { headers: { "content-type": "image/svg+xml" } }),
     ...Object.fromEntries(APP_FILES.map((f) => [`/${f}`, () => new Response(Bun.file(join(PUBLIC, f)), APP_HEADERS[f])])),
 
-    "/api/state": async (req) => Response.json({ ...(await state(vault)), auth: hasPassword, lockAfter: LOCK_AFTER, local: onThisMac(req) }),
+    "/api/state": async (req) => Response.json({ ...(await state(vault)), auth: hasPassword, lockAfter: LOCK_AFTER, local: onThisMac(req), beeper: beeperOn() }),
     "/api/menu": async () => Response.json(await menu()),
+    // Read fresh from Beeper on every call, so the Talk screen is as current as Beeper is.
+    "/api/talk": (req) => {
+      if (!beeperOn()) return Response.json({ error: "Beeper is off on this machine" }, { status: 404 });
+      const days = Math.min(3650, Math.max(1, Number(new URL(req.url).searchParams.get("days")) || 90));
+      const t = talk(days);
+      return Response.json(t, { status: "error" in t ? 503 : 200 });
+    },
 
     "/api/events": (req) => {
       let send: (at: number) => void;
