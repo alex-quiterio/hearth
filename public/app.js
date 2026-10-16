@@ -599,7 +599,7 @@ function emberSection() {
       <p class="muted kindle-from">${esc(when)} · <a href="${obsidianLink(e.note)}">${esc(e.note)}</a></p>
     </div>
     <div class="kindle-buttons">
-      <button class="tiny" data-run="${esc(prompt)}" title="Ask Claude to sit with this one">Sit with it</button>
+      <button class="tiny" data-run="${esc(prompt)}" title="Ask your AI buddy to sit with this one">Sit with it</button>
       ${all.length > 1 ? `<button class="tiny ghost" data-ember-next title="Another one (${all.length} to draw from)">Another</button>` : ""}
     </div>
   </section>`;
@@ -803,7 +803,7 @@ function updateRailDot() {
   const dot = $("#railDot");
   dot.hidden = !(running || waitingPermissions);
   dot.classList.toggle("ask", waitingPermissions > 0);
-  $("#rail").title = waitingPermissions ? "Claude is waiting for your approval" : running ? "Claude is working" : "Open the conversation (\\)";
+  $("#rail").title = waitingPermissions ? "Your AI buddy is waiting for your approval" : running ? "Your AI buddy is working" : "Open the conversation (\\)";
 }
 
 /* ---------- chat ---------- */
@@ -815,6 +815,35 @@ let bubbleText = "";
 
 function scrollLog() { const l = $("#log"); l.scrollTop = l.scrollHeight; }
 
+/* Copy: a small button at the foot of each message that puts its text, as written, on the clipboard. */
+const ICON_COPY = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>`;
+const ICON_COPIED = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
+function copyable(el, text) {
+  el.dataset.copy = text;
+  el.insertAdjacentHTML("beforeend", `<div class="msg-foot"><button type="button" class="copy" data-copy-msg title="Copy" aria-label="Copy this message">${ICON_COPY}</button></div>`);
+  return el;
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch {}
+  // Without a secure context (plain http off this Mac) the clipboard API is missing: fall back to a hidden textarea.
+  const t = Object.assign(document.createElement("textarea"), { value: text });
+  t.style.cssText = "position:fixed;opacity:0";
+  document.body.appendChild(t); t.select();
+  const ok = document.execCommand("copy");
+  t.remove();
+  return ok;
+}
+$("#log").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-copy-msg]");
+  if (!b) return;
+  const ok = await copyText(b.closest(".msg").dataset.copy ?? "");
+  b.innerHTML = ok ? ICON_COPIED : ICON_COPY;
+  b.title = ok ? "Copied" : "Could not copy";
+  b.classList.toggle("done", ok);
+  clearTimeout(b._t);
+  b._t = setTimeout(() => { b.innerHTML = ICON_COPY; b.title = "Copy"; b.classList.remove("done"); }, 1500);
+});
+
 function append(cls, html) {
   $(".hint", $("#log"))?.remove();
   const el = document.createElement("div");
@@ -825,6 +854,21 @@ function append(cls, html) {
   if (queueEl) $("#log").appendChild(queueEl);
   scrollLog();
   return el;
+}
+
+/* Tool calls fold into one collapsed "N steps" row per stretch between replies; click to see them. */
+function addStep(name, detail = "") {
+  const log = $("#log");
+  let last = log.lastElementChild;
+  while (last && (last === work || last === queueEl)) last = last.previousElementSibling;
+  const box = last?.classList.contains("steps") ? last : append("steps", `<details><summary></summary><div class="steps-list"></div></details>`);
+  const row = document.createElement("div");
+  row.className = "tool";
+  row.innerHTML = `↳ ${esc(name)}${detail ? ` · ${esc(detail)}` : ""}`;
+  $(".steps-list", box).appendChild(row);
+  const n = $(".steps-list", box).children.length;
+  $("summary", box).innerHTML = `${n} step${n === 1 ? "" : "s"} <span class="muted">· ${esc(name)}</span>`;
+  scrollLog();
 }
 
 function light(text) {
@@ -856,7 +900,7 @@ function renderWork() {
   $("#chatStatus").textContent = status;
   document.title = `${asking ? "◆ Approve" : "● " + workText} · ${BASE_TITLE}`;
   const fab = $("#openChat");
-  if (fab) fab.textContent = asking ? "Approve in Conversation" : `Claude is ${workText.toLowerCase()}…`;
+  if (fab) fab.textContent = asking ? "Approve in Conversation" : `AI buddy is ${workText.toLowerCase()}…`;
 }
 function showWork() {
   if (!work) {
@@ -1005,7 +1049,7 @@ function startNew(prompt) {
   proposal?.remove();
   const thread = hasThread();
   proposal = append("proposal", `
-    <div class="proposal-head"><strong>Send this to Claude?</strong>
+    <div class="proposal-head"><strong>Send this to your AI buddy?</strong>
       <span class="muted">${thread ? "You are in a conversation." : "Edit it first if you like."}</span></div>
     <textarea rows="2" aria-label="Prompt to send"></textarea>
     <div class="chat-buttons">
@@ -1013,7 +1057,7 @@ function startNew(prompt) {
       ${thread ? `<button type="button" class="ghost" data-here>Send in this conversation</button>` : ""}
       <button type="button" class="primary" data-new>${thread ? "Start new conversation" : "Send"}</button>
     </div>
-    <p class="muted proposal-note" hidden>Claude is still working. You can send when the turn ends.</p>`);
+    <p class="muted proposal-note" hidden>Your AI buddy is still working. You can send when the turn ends.</p>`);
   const card = proposal;
   const box = $("textarea", card);
   box.value = prompt;
@@ -1048,7 +1092,7 @@ async function send(message) {
   if (!message.trim()) return;
   if (running) { queue.push(message.trim()); renderQueue(); return; }
   stopAsked = false;
-  append("msg user", esc(message));
+  copyable(append("msg user", esc(message)), message);
   bubble = null; bubbleText = "";
   setRunning(true);
   try {
@@ -1090,18 +1134,19 @@ function handle(ev) {
       if (!bubble) bubble = append("msg assistant", "");
       bubbleText += ev.delta;
       bubble.innerHTML = light(bubbleText);
+      copyable(bubble, bubbleText);
       if (work) $("#log").appendChild(work);
       scrollLog();
       break;
     case "tool":
       bubble = null; bubbleText = "";
-      append("tool", `↳ ${esc(ev.name)}${ev.summary ? ` · ${esc(ev.summary)}` : ""}`);
+      addStep(ev.name, ev.summary);
       break;
     case "permission": {
       bubble = null; bubbleText = "";
       waitingPermissions++;
       updateRailDot();
-      const el = append("perm", `<strong>Claude wants to use ${esc(ev.tool)}</strong><pre>${esc(ev.summary)}</pre>
+      const el = append("perm", `<strong>Your AI buddy wants to use ${esc(ev.tool)}</strong><pre>${esc(ev.summary)}</pre>
         <div class="chat-buttons"><button class="ghost" data-deny>Deny</button><button class="primary" data-allow>Allow</button></div>`);
       const decide = async (allow) => {
         delete el.dataset.open;
@@ -1161,7 +1206,7 @@ $("#input").addEventListener("keydown", (e) => {
 $("#stop").onclick = () => (stopAsked = true, fetch("/api/stop", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }));
 $("#newChat").onclick = () => {
   if (running) return;
-  if ($(".msg", $("#log")) && !confirm("Start a new conversation? This one stays in Claude Code's history but leaves this panel.")) return;
+  if ($(".msg", $("#log")) && !confirm("Start a new conversation? This one stays in your AI buddy's history but leaves this panel.")) return;
   proposal = null;
   sessionId = null;
   $("#log").innerHTML = `<p class="muted hint">New conversation.</p>`;
@@ -1182,8 +1227,8 @@ function showAutoAllow() {
   const b = $("#autoAllow");
   b.textContent = autoAllow ? "Auto-allow on" : "Auto-allow off";
   b.title = autoAllow
-    ? "Claude runs every tool without asking (Beeper sends and changes still ask). Click to turn it off"
-    : "Claude asks before tools outside the vault. Click to let it run them without asking";
+    ? "Your AI buddy runs every tool without asking (Beeper sends and changes still ask). Click to turn it off"
+    : "Your AI buddy asks before tools outside the vault. Click to let it run them without asking";
   b.setAttribute("aria-pressed", String(autoAllow));
 }
 showAutoAllow();
@@ -1252,11 +1297,21 @@ const when = (ms) => {
   return d.toLocaleDateString([], { day: "numeric", month: "short", ...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}) }) + ` ${time}`;
 };
 
+// A clock turning back for the list of past conversations; an arrow back to this one while it is open.
+const ICON_HISTORY = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6"/><path d="M3 4v4h4"/><path d="M12 7.5V12l3 2"/></svg>`;
+const ICON_BACK = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>`;
+function showHistoryIcon(open) {
+  const b = $("#historyBtn");
+  b.innerHTML = open ? ICON_BACK : ICON_HISTORY;
+  b.title = open ? "Back to this conversation" : "Previous conversations";
+  b.setAttribute("aria-label", b.title);
+}
+
 function showHistory(on) {
   $("#history").hidden = !on;
   $("#log").hidden = on;
   $("#historyBtn").setAttribute("aria-expanded", String(on));
-  $("#historyBtn").textContent = on ? "Back" : "History";
+  showHistoryIcon(on);
   if (on) loadHistory();
 }
 
@@ -1277,7 +1332,7 @@ async function loadHistory() {
 }
 
 async function openSession(id) {
-  if (running) { toast("Claude is still working. Stop the turn first."); return; }
+  if (running) { toast("Your AI buddy is still working. Stop the turn first."); return; }
   if (id === sessionId) { showHistory(false); return; }
   if ($(".msg", $("#log")) && !confirm("Open this conversation? The one in the panel stays in History.")) return;
   const lines = await (await fetch(`/api/sessions/${encodeURIComponent(id)}`)).json();
@@ -1287,18 +1342,19 @@ async function openSession(id) {
   bubble = null; bubbleText = "";
   $("#log").innerHTML = `<p class="muted hint">An earlier conversation. Write below to continue it.</p>`;
   for (const l of lines) {
-    if (l.kind === "user") append("msg user", esc(l.text));
-    else if (l.kind === "assistant") append("msg assistant", light(l.text));
-    else append("tool", `↳ ${esc(l.text)}`);
+    if (l.kind === "user") copyable(append("msg user", esc(l.text)), l.text);
+    else if (l.kind === "assistant") copyable(append("msg assistant", light(l.text)), l.text);
+    else { const [name, ...rest] = l.text.split(" · "); addStep(name, rest.join(" · ")); }
   }
   $("#chatStatus").textContent = "continuing";
 }
 
 $("#historyBtn").onclick = () => showHistory($("#history").hidden);
+showHistoryIcon(false);
 $("#history").addEventListener("click", async (e) => {
   const del = e.target.closest("[data-del]");
   if (del) {
-    if (!confirm("Delete this conversation for good? It is removed from Claude Code too.")) return;
+    if (!confirm("Delete this conversation for good? It is removed from your AI buddy's history too.")) return;
     const id = del.dataset.del;
     await fetch(`/api/sessions/${encodeURIComponent(id)}`, { method: "DELETE" });
     if (id === sessionId) { sessionId = null; $("#log").innerHTML = `<p class="muted hint">New conversation.</p>`; }
