@@ -473,5 +473,13 @@ body.chat-collapsed .chat-resize { display: none; }
 @media (prefers-reduced-motion: reduce) { .kindle-glyph { animation: none; } }
 @media (max-width: 560px) { .kindle { grid-template-columns: auto 1fr; } .kindle-buttons { grid-column: 1 / -1; flex-direction: row; justify-content: flex-end; } }
 
-/* The commit this server runs, quiet in the corner of every page. */
-.build { position: fixed; left: 8px; bottom: 6px; font: 11px ui-monospace, monospace; color: var(--muted); opacity: .7; pointer-events: none; z-index: 1; }
+/* The app version: the commit this server runs, as a small pill in the corner of every page. */
+.build {
+  position: fixed; left: 12px; bottom: 12px; z-index: 1; pointer-events: none;
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 8px;
+  font: 500 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .02em; color: var(--ink-2);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / .08);
+}
+.build::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--clay); box-shadow: 0 0 6px var(--clay); }
+.build span { font-family: Fraunces, Georgia, serif; font-weight: 600; letter-spacing: 0; color: var(--ink); }
