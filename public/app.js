@@ -1386,7 +1386,7 @@ function handle(ev) {
       $("[data-deny]", el).onclick = () => decide(false);
       // Enter in the why box denies; it never allows by accident.
       $(".why", el).onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); decide(false); } };
-      // Only a card the server marked unguarded may be allowed for you; Beeper changes always wait.
+      // Only a card the server marked unguarded may be allowed for you; Beeper changes other than sends always wait.
       if (ev.guarded === false) el.dataset.open = "";
       if (ev.guarded === false && autoAllow) decide(true);
       renderWork();
@@ -1447,8 +1447,8 @@ $("#closeChat").onclick = () => $("#chat").classList.remove("open");
 load();
 listen();
 
-/* Auto-allow: Claude runs every tool without the Allow/Deny card, except Beeper tools that change anything,
-   which the server always asks about. Off by default; each browser remembers its own choice.
+/* Auto-allow: Claude runs every tool without the Allow/Deny card, Beeper sends included, except other Beeper
+   changes (archive, edit, delete…), which the server always asks about. Off by default; each browser remembers its own choice.
    Turning it on mid-turn also allows the cards already waiting. */
 let autoAllow = store.get("hearth.autoAllow") === "1";
 function showAutoAllow() {
@@ -1456,7 +1456,7 @@ function showAutoAllow() {
   b.querySelector(".label").textContent = autoAllow ? "Auto-allow on" : "Auto-allow off";
   b.setAttribute("aria-label", autoAllow ? "Auto-allow on" : "Auto-allow off");
   b.title = autoAllow
-    ? "Your AI buddy runs every tool without asking (Beeper sends and changes still ask). Click to turn it off"
+    ? "Your AI buddy runs every tool and sends Beeper messages without asking (other Beeper changes still ask). Click to turn it off"
     : "Your AI buddy asks before tools outside the vault. Click to let it run them without asking";
   b.setAttribute("aria-pressed", String(autoAllow));
 }

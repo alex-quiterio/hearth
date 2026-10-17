@@ -33,10 +33,13 @@ export function stop() {
 }
 
 const READ_ONLY = new Set(["Read", "Glob", "Grep", "Skill", "ToolSearch", "WebSearch", "WebFetch", "TodoWrite", "Agent", "Task"]);
-// Anything on Beeper that changes the outside world asks first, every time.
+// Anything on Beeper that changes the outside world asks first, unless auto-allow is on and it's a send.
 const BEEPER_WRITE = /send|edit|delete|archive|mark|react|set_|create|update|remind|pin|mute/i;
-/** A tool that always asks, even with auto-allow on. */
-export const guarded = (tool: string) => tool.startsWith("mcp__beeper__") && BEEPER_WRITE.test(tool.slice("mcp__beeper__".length));
+/** A tool that always asks, even with auto-allow on: Beeper changes other than sending a message. */
+export const guarded = (tool: string) => {
+  const name = tool.startsWith("mcp__beeper__") ? tool.slice("mcp__beeper__".length) : "";
+  return !!name && BEEPER_WRITE.test(name) && !/^send/i.test(name);
+};
 
 // Shell commands that only look. Read is already free for any path, so these add no reach.
 const LOOK = new Set(["cat", "head", "tail", "grep", "rg", "ls", "find", "wc", "date", "echo", "sort", "cut", "stat", "file", "pwd"]);
@@ -140,7 +143,7 @@ export function listModels(): Promise<ModelInfo[]> {
   return models;
 }
 
-/** autoAllow: the page's Auto-allow toggle. Everything runs without asking except Beeper tools that change anything. */
+/** autoAllow: the page's Auto-allow toggle. Everything runs without asking, Beeper sends included, except other Beeper changes. */
 export async function* chat(message: string, vault: string, sessionId?: string, model?: string, autoAllow = false): AsyncGenerator<ChatEvent> {
   running?.abort();
   const abort = new AbortController();
