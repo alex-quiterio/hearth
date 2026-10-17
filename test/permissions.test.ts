@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { autoAllowed, guarded } from "../src/agent";
+import { autoAllowed, covers, opensAt } from "../src/agent";
 
 describe("what runs without asking", () => {
   test("reads and skills", () => {
@@ -67,9 +67,21 @@ describe("what runs without asking", () => {
   });
 
   test("with auto-allow on, Beeper sends go through and other changes still ask", () => {
-    expect(guarded("mcp__beeper__send_message")).toBe(false);
+    expect(covers("all", opensAt("mcp__beeper__send_message"))).toBe(true);
     for (const t of ["edit_message", "archive_chat", "mark_as_read", "set_chat_reminder", "add_reaction"])
-      expect(guarded(`mcp__beeper__${t}`)).toBe(true);
-    expect(guarded("Bash")).toBe(false);
+      expect(covers("all", opensAt(`mcp__beeper__${t}`))).toBe(false);
+    expect(covers("all", opensAt("Bash"))).toBe(true);
+  });
+
+  test("with auto-allow on but Beeper asking, everything runs except Beeper changes, sends included", () => {
+    expect(covers("most", opensAt("Bash"))).toBe(true);
+    expect(covers("most", opensAt("Write"))).toBe(true);
+    expect(covers("most", opensAt("mcp__beeper__list_messages"))).toBe(true);
+    for (const t of ["send_message", "edit_message", "archive_chat", "set_chat_reminder"])
+      expect(covers("most", opensAt(`mcp__beeper__${t}`))).toBe(false);
+  });
+
+  test("with auto-allow off, nothing is covered", () => {
+    for (const t of ["Bash", "mcp__beeper__send_message"]) expect(covers("off", opensAt(t))).toBe(false);
   });
 });

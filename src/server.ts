@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { watch } from "node:fs";
 import { findVault, state, lastChange, kinState, kinPeople, PATHS, VAULT_NAME } from "./vault";
 import { waterPlant } from "./garden";
-import { chat, answerPermission, stop, listModels } from "./agent";
+import { chat, answerPermission, stop, listModels, type AutoAllow } from "./agent";
 import { sessions, transcript, forget } from "./history";
 import { saveAttachment, vaultFile, sweepAttachments, type Attachment } from "./attach";
 import { loadAuth, authed, login, logout, onThisMac, AUTH_FILE } from "./auth";
@@ -139,13 +139,15 @@ Bun.serve({
 
     "/api/chat": {
       POST: async (req) => {
-        const { message, sessionId, model, autoAllow } = (await req.json()) as { message?: string; sessionId?: string; model?: string; autoAllow?: boolean };
+        const { message, sessionId, model, autoAllow } = (await req.json()) as { message?: string; sessionId?: string; model?: string; autoAllow?: boolean | string };
+        // true is what a page from before the "most" mode sends for Auto-allow on.
+        const mode: AutoAllow = autoAllow === true || autoAllow === "all" ? "all" : autoAllow === "most" ? "most" : "off";
         if (!message?.trim()) return Response.json({ error: "empty message" }, { status: 400 });
         const enc = new TextEncoder();
         const stream = new ReadableStream({
           async start(c) {
             try {
-              for await (const e of chat(message, vault, sessionId, model && model !== "default" ? model : undefined, autoAllow === true)) c.enqueue(enc.encode(sse(e)));
+              for await (const e of chat(message, vault, sessionId, model && model !== "default" ? model : undefined, mode))c.enqueue(enc.encode(sse(e)));
             } catch (e) {
               c.enqueue(enc.encode(sse({ type: "error", message: (e as Error).message })));
             }

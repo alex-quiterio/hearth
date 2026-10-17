@@ -1321,7 +1321,7 @@ async function send(message) {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ message, ...(sessionId && { sessionId }), ...($("#model").value && { model: $("#model").value }), ...(autoAllow && { autoAllow }) }),
+      body: JSON.stringify({ message, ...(sessionId && { sessionId }), ...($("#model").value && { model: $("#model").value }), ...(autoAllow !== "off" && { autoAllow }) }),
     });
     if (!res.ok || !res.body) throw new Error(`${res.status} ${await res.text()}`);
     const reader = res.body.getReader();
@@ -1373,7 +1373,7 @@ function handle(ev) {
         <div class="chat-buttons"><button class="ghost" data-deny>Deny</button><button class="primary" data-allow>Allow</button></div>`);
       const decide = async (allow) => {
         if (!el.isConnected || !$(".chat-buttons", el)) return;
-        delete el.dataset.open;
+        delete el.dataset.opensAt;
         const why = allow ? "" : $(".why", el).value.trim();
         $(".why", el).remove();
         $(".chat-buttons", el).outerHTML = `<div class="done">${allow ? "Allowed" : "Denied"}${why ? `: ${esc(why)}` : ""}</div>`;
@@ -1386,9 +1386,10 @@ function handle(ev) {
       $("[data-deny]", el).onclick = () => decide(false);
       // Enter in the why box denies; it never allows by accident.
       $(".why", el).onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); decide(false); } };
-      // Only a card the server marked unguarded may be allowed for you; Beeper changes other than sends always wait.
-      if (ev.guarded === false) el.dataset.open = "";
-      if (ev.guarded === false && autoAllow) decide(true);
+      // The server says which Auto-allow may answer this card for you: "most" (off Beeper), "all" (a Beeper send), or
+      // none, for other Beeper changes, which always wait.
+      if (ev.opensAt) el.dataset.opensAt = ev.opensAt;
+      if (covers(ev.opensAt)) decide(true);
       renderWork();
       break;
     }
@@ -1447,25 +1448,32 @@ $("#closeChat").onclick = () => $("#chat").classList.remove("open");
 load();
 listen();
 
-/* Auto-allow: Claude runs every tool without the Allow/Deny card, Beeper sends included, except other Beeper
-   changes (archive, edit, delete…), which the server always asks about. Off by default; each browser remembers its own choice.
-   Turning it on mid-turn also allows the cards already waiting. */
-let autoAllow = store.get("hearth.autoAllow") === "1";
+/* Auto-allow, three steps the button cycles through. Off: the card for anything outside the vault. Most: every tool runs
+   without the card except Beeper changes, sends included. All: Beeper sends go through too; other Beeper changes
+   (archive, edit, delete…) always ask. Off by default; each browser remembers its own choice ("1" was the old on).
+   Stepping up mid-turn also allows the cards already waiting that the new step covers. */
+const AUTO = {
+  off: { label: "Auto-allow off", pressed: "false", title: "Your AI buddy asks before tools outside the vault. Click to let it run them without asking, Beeper changes still ask" },
+  most: { label: "Auto-allow, Beeper asks", pressed: "mixed", title: "Your AI buddy runs every tool without asking, but asks before anything that changes Beeper, sends included. Click to let Beeper sends through too" },
+  all: { label: "Auto-allow on", pressed: "true", title: "Your AI buddy runs every tool and sends Beeper messages without asking (other Beeper changes still ask). Click to turn it off" },
+};
+const savedAuto = store.get("hearth.autoAllow");
+let autoAllow = savedAuto === "1" ? "all" : Object.hasOwn(AUTO, savedAuto ?? "") ? savedAuto : "off";
+const RANK = { off: 0, most: 1, all: 2 };
+const covers = (opensAt) => !!opensAt && autoAllow !== "off" && RANK[autoAllow] >= RANK[opensAt];
 function showAutoAllow() {
-  const b = $("#autoAllow");
-  b.querySelector(".label").textContent = autoAllow ? "Auto-allow on" : "Auto-allow off";
-  b.setAttribute("aria-label", autoAllow ? "Auto-allow on" : "Auto-allow off");
-  b.title = autoAllow
-    ? "Your AI buddy runs every tool and sends Beeper messages without asking (other Beeper changes still ask). Click to turn it off"
-    : "Your AI buddy asks before tools outside the vault. Click to let it run them without asking";
-  b.setAttribute("aria-pressed", String(autoAllow));
+  const b = $("#autoAllow"), a = AUTO[autoAllow];
+  b.querySelector(".label").textContent = a.label;
+  b.setAttribute("aria-label", a.label);
+  b.title = a.title;
+  b.setAttribute("aria-pressed", a.pressed);
 }
 showAutoAllow();
 $("#autoAllow").onclick = () => {
-  autoAllow = !autoAllow;
-  store.set("hearth.autoAllow", autoAllow ? "1" : "0");
+  autoAllow = { off: "most", most: "all", all: "off" }[autoAllow];
+  store.set("hearth.autoAllow", autoAllow);
   showAutoAllow();
-  if (autoAllow) document.querySelectorAll("#log .perm[data-open] [data-allow]").forEach((b) => b.click());
+  document.querySelectorAll("#log .perm[data-opens-at]").forEach((el) => { if (covers(el.dataset.opensAt)) $("[data-allow]", el)?.click(); });
 };
 
 /* Stop the server from the page. The launcher (Hearth.app) starts it again. */

@@ -78,6 +78,11 @@ Reads, skills and plain `obsidian …` CLI calls run without asking. Everything 
 Allow / Deny card in the chat, and so does any Beeper call that sends, edits or marks
 anything, every single time. The server listens on 127.0.0.1 only.
 
+The ⚡ Auto-allow button next to Send steps through three settings, remembered per browser:
+**off** (as above), **Beeper asks** (every tool runs without a card, but any Beeper change,
+sends included, still asks) and **on** (Beeper sends go through too; other Beeper changes
+still ask).
+
 ## Login
 
 `bun run password` sets a password (and changing it logs out every browser). From then on

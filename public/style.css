@@ -268,7 +268,8 @@ button.name { cursor: pointer; } button.name:hover { color: var(--clay-ink); }
 #autoAllow { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding-inline: 12px; white-space: nowrap; color: var(--muted); }
 #autoAllow .label { margin: 0; color: inherit; line-height: 1; } /* not the section .label: no margins, same ink as the bolt */
 #autoAllow svg { flex: none; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
-#autoAllow[aria-pressed="true"] { color: var(--clay-ink); border-color: var(--clay); }
+#autoAllow[aria-pressed="true"], #autoAllow[aria-pressed="mixed"] { color: var(--clay-ink); border-color: var(--clay); }
+/* The middle step (Beeper asks) keeps the bolt hollow, so it reads apart from on even when the label is hidden. */
 #autoAllow[aria-pressed="true"] svg { fill: currentColor; }
 /* The composer can get narrow (a phone, or the pane dragged thin): auto-allow drops to its icon so Send / Queue always fits. */
 .chat-input { container-type: inline-size; }

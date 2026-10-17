@@ -9,7 +9,7 @@ export type ChatEvent =
   | { type: "session"; sessionId: string }
   | { type: "text"; delta: string }
   | { type: "tool"; name: string; summary: string }
-  | { type: "permission"; id: string; tool: string; summary: string; guarded: boolean }
+  | { type: "permission"; id: string; tool: string; summary: string; opensAt: Exclude<AutoAllow, "off"> | null }
   | { type: "status"; text: string }
   | { type: "activity"; text: string }
   | { type: "done"; costUsd: number; isError: boolean; result?: string }
@@ -33,13 +33,22 @@ export function stop() {
 }
 
 const READ_ONLY = new Set(["Read", "Glob", "Grep", "Skill", "ToolSearch", "WebSearch", "WebFetch", "TodoWrite", "Agent", "Task"]);
-// Anything on Beeper that changes the outside world asks first, unless auto-allow is on and it's a send.
+// Anything on Beeper that changes the outside world asks first, unless auto-allow is all the way on and it's a send.
 const BEEPER_WRITE = /send|edit|delete|archive|mark|react|set_|create|update|remind|pin|mute/i;
-/** A tool that always asks, even with auto-allow on: Beeper changes other than sending a message. */
-export const guarded = (tool: string) => {
+
+/** The page's Auto-allow: off, "most" (everything but Beeper changes), or "all" (Beeper sends too). */
+export type AutoAllow = "off" | "most" | "all";
+const RANK: Record<AutoAllow, number> = { off: 0, most: 1, all: 2 };
+
+/** The least Auto-allow that lets a tool run without the card: "most" for anything off Beeper, "all" for a
+ *  Beeper send, null for other Beeper changes, which always ask. */
+export function opensAt(tool: string): Exclude<AutoAllow, "off"> | null {
   const name = tool.startsWith("mcp__beeper__") ? tool.slice("mcp__beeper__".length) : "";
-  return !!name && BEEPER_WRITE.test(name) && !/^send/i.test(name);
-};
+  if (!name || !BEEPER_WRITE.test(name)) return "most";
+  return /^send/i.test(name) ? "all" : null;
+}
+
+export const covers = (mode: AutoAllow, opens: AutoAllow | null) => !!opens && mode !== "off" && RANK[mode] >= RANK[opens];
 
 // Shell commands that only look. Read is already free for any path, so these add no reach.
 const LOOK = new Set(["cat", "head", "tail", "grep", "rg", "ls", "find", "wc", "date", "echo", "sort", "cut", "stat", "file", "pwd"]);
@@ -143,8 +152,8 @@ export function listModels(): Promise<ModelInfo[]> {
   return models;
 }
 
-/** autoAllow: the page's Auto-allow toggle. Everything runs without asking, Beeper sends included, except other Beeper changes. */
-export async function* chat(message: string, vault: string, sessionId?: string, model?: string, autoAllow = false): AsyncGenerator<ChatEvent> {
+/** autoAllow: the page's Auto-allow. "most" runs everything without asking except Beeper changes; "all" lets Beeper sends through too. */
+export async function* chat(message: string, vault: string, sessionId?: string, model?: string, autoAllow: AutoAllow = "off"): AsyncGenerator<ChatEvent> {
   running?.abort();
   const abort = new AbortController();
   running = abort;
@@ -156,9 +165,10 @@ export async function* chat(message: string, vault: string, sessionId?: string, 
   };
 
   const canUseTool: CanUseTool = async (tool, input, { signal }) => {
-    if ((autoAllow && !guarded(tool)) || autoAllowed(tool, input, vault)) return { behavior: "allow", updatedInput: input };
+    const opens = opensAt(tool);
+    if (covers(autoAllow, opens) || autoAllowed(tool, input, vault)) return { behavior: "allow", updatedInput: input };
     const id = crypto.randomUUID();
-    push({ type: "permission", id, tool, summary: summarize(tool, input), guarded: guarded(tool) });
+    push({ type: "permission", id, tool, summary: summarize(tool, input), opensAt: opens });
     return new Promise<PermissionResult>((resolve) => {
       pending.set(id, (r) => resolve(r.behavior === "allow" ? { ...r, updatedInput: input } : r));
       signal.addEventListener("abort", () => answerPermission(id, false));
