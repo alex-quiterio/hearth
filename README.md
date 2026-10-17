@@ -10,7 +10,7 @@ bun run dev          # the same, restarting itself when src/ changes, so a refre
 ```
 
 Or build a double-clickable launcher with the flame icon: `scripts/make-app.sh` puts
-`Hearth.app` on the Desktop. It opens the page, starting the server first if needed; when the server is
+`Hearth.app` in Applications (or pass another folder: `scripts/make-app.sh ~/Desktop`). It opens the page, starting the server first if needed; when the server is
 already running it asks whether to Open or Stop it
 (log in `~/Library/Logs/hearth.log`).
 

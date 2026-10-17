@@ -1517,7 +1517,7 @@ $("#shutdown").onclick = async () => {
   clearTimeout(retry);
   events?.close();
   document.body.innerHTML = `<main class="stopped"><h1>Hearth is resting</h1>
-    <p class="muted">The server is stopped. Open <strong>Hearth.app</strong> on your Desktop to light it again.</p>
+    <p class="muted">The server is stopped. Open <strong>Hearth.app</strong> in Applications to light it again.</p>
     <p class="muted">Meanwhile, one small ember is still going:</p><div class="ember-slot"></div></main>`;
   window.emberGame?.($(".stopped .ember-slot"));
   document.title = "Hearth (stopped)";

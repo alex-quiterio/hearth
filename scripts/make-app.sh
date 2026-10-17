@@ -2,7 +2,7 @@
 # Build Hearth.app (the launcher in Hearth.applescript) with the flame icon. Usage: scripts/make-app.sh [dest dir]
 set -e
 here="$(cd "$(dirname "$0")/.." && pwd)"
-dest="${1:-$HOME/Desktop}"
+dest="${1:-/Applications}"
 app="$dest/Hearth.app"
 tmp="$(mktemp -d)"
 
