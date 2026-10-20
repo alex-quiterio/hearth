@@ -7,7 +7,7 @@ const day = (d) => (d ? String(d).slice(0, 10) : "");
 const PLACE = { here: "here", land: "near the land", lisbon: "Lisbon", far: "far" };
 const RING_ORDER = ["core", "close", "warm", "new", "drifting"];
 const RING_NAME = { core: "Core", close: "Close", warm: "Warm", new: "New", drifting: "Drifting" };
-const FROM = { thread: "a thread you wrote", tending: "the tending log", water: "marked tended here", map: "the kin map" };
+const FROM = { thread: "a thread you wrote", tending: "the tending log", water: "marked tended here", map: "the kin map", beeper: "a message on Beeper" };
 
 // Logged out (password changed, or the year is up): every call answers 401, so go back to the login page.
 const rawFetch = window.fetch.bind(window);
@@ -75,7 +75,13 @@ const plantOf = (name) => G.plants.find((p) => p.name === name) ?? G.plants.find
 const firstName = (n) => String(n).replace(/^the\s+/i, "").split(/\s+/)[0];
 const obsidianLink = (name) => `obsidian://open?vault=${encodeURIComponent(S.vaultName)}&file=${encodeURIComponent(name)}`;
 const daysUntil = (d) => (d ? Math.round((Date.parse(day(d)) - Date.parse(G.today)) / 864e5) : null);
+const spanText = (days) => (days < 1 ? `${Math.max(1, Math.round(days * 24))} hours` : days === 1 ? "1 day" : days % 7 === 0 ? (days === 7 ? "1 week" : `${days / 7} weeks`) : `${Math.round(days)} days`);
 function sinceText(p) {
+  if (p.waitingSince) {
+    const h = Math.floor((Date.now() - p.waitingSince) / 36e5);
+    const ago = h < 1 ? "in the last hour" : h < 24 ? `${h} hours ago` : h < 48 ? "yesterday" : `${Math.floor(h / 24)} days ago`;
+    return `wrote to you ${ago}, waiting on your reply (within ${spanText(p.replyWithin)})`;
+  }
   const d = p.daysSince;
   if (d == null) return "no record of contact yet";
   if (d === 0) return "in touch today";
@@ -86,7 +92,7 @@ function sinceText(p) {
 
 function applyWater(name) {
   const p = plantOf(name);
-  if (p) Object.assign(p, { thirst: "fresh", daysSince: 0, lastTended: G.today, lastTendedFrom: "water" });
+  if (p) Object.assign(p, { thirst: "fresh", daysSince: 0, lastTended: G.today, lastTendedFrom: "water", waitingSince: null });
   const w = G.thisWeek.find((t) => t.name === name);
   if (w && !w.done) Object.assign(w, { done: true, outcome: w.outcome || "tended today" });
 }
@@ -487,9 +493,27 @@ function shiftsSection() {
     <span class="muted">Kin map people first; tap one to open them.</span></div>`;
 }
 
+// Kin waiting on a reply past twice their window: the red end of the reply clock. The garden
+// knows each window; the shifts, refetched every minute, drop anyone answered since.
+function replyAlert() {
+  const answered = (p) => SH?.all?.some((c) => c.kin === p.name && c.lastSent > p.waitingSince);
+  const late = (G?.plants ?? [])
+    .filter((p) => p.waitingSince && p.replyWithin && !answered(p))
+    .map((p) => ({ p, over: (Date.now() - p.waitingSince) / DAY_MS / p.replyWithin }))
+    .filter((x) => x.over > 2)
+    .sort((a, b) => b.over - a.over);
+  if (!late.length) return "";
+  const li = ({ p }) => `<li><button class="name" data-sheet="${esc(p.name)}">${esc(p.name)}</button>
+    <small>wrote ${esc(agoMs(p.waitingSince))} · reply within ${esc(spanText(p.replyWithin))}</small>
+    <button class="tiny ghost" data-run="${esc(`/beeper:thread-reply ${p.name}`)}" title="Draft a reply">Reply</button></li>`;
+  return `<div class="reply-alert" role="alert"><strong>⚠ ${late.length === 1 ? "1 person is" : `${late.length} people are`} long past a reply</strong>
+    <ul>${late.map(li).join("")}</ul></div>`;
+}
+
 function renderTalk() {
   const P = T.people, N = P.length;
   const head = `<h2>Who I talk to <span class="sub">direct chats on Beeper · updated ${new Date(T.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></h2>
+    ${replyAlert()}
     <div class="talk-bar"><div class="talk-days" role="group" aria-label="Time window">${[7, 30, 90, 365].map((d) => `<button class="ghost" data-talk-days="${d}" aria-pressed="${d === talkDays}">${d === 7 ? "Last week" : d === 365 ? "1 year" : `${d} days`}</button>`).join("")}</div>
     <button class="ghost" data-talk-refresh title="Count again from Beeper">↻ Refresh</button></div>`;
   if (!N) { $("#talkScreen").innerHTML = `<section class="panel talk">${head}<p class="muted">No direct messages in this window.</p></section>`; return; }
@@ -919,7 +943,7 @@ function openSheet(name) {
   if (!p) { toast(`${name} is not in the kin map.`); return; }
   $("#sheet").innerHTML = `<form method="dialog" class="sheet-close"><button class="ghost" aria-label="Close">✕</button></form>
     <h2>${p.linked ? `<a href="${obsidianLink(p.name)}">${n}</a>` : n}</h2>
-    <p class="muted">${esc(RING_NAME[p.ring])}${p.placeLabel ? ` · ${esc(p.placeLabel)}` : ""}</p>
+    <p class="muted">${esc(RING_NAME[p.ring])}${p.placeLabel ? ` · ${esc(p.placeLabel)}` : ""} · every ${spanText(p.interval)}${p.replyWithin ? `, reply within ${spanText(p.replyWithin)}` : ""}</p>
     <p class="since-line t-${esc(p.thirst)}"><i class="tdot t-${esc(p.thirst)}"></i>${esc(sinceText(p))}${p.lastTendedFrom ? ` <span class="muted">· from ${esc(FROM[p.lastTendedFrom] ?? p.lastTendedFrom)}</span>` : ""}</p>
     ${p.note ? `<p class="note">${esc(p.note.replace(/\[\[([^\]|]+)(\|[^\]]+)?\]\]/g, "$1"))}</p>` : ""}
     ${p.draftsWaiting ? `<p><span class="badge">${p.draftsWaiting} draft${p.draftsWaiting > 1 ? "s" : ""} not fully sent</span></p>` : ""}

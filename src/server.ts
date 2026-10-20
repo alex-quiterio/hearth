@@ -108,7 +108,7 @@ Bun.serve({
     // Who is warming, cooling, gone quiet or waiting on a reply, matched against the kin map.
     "/api/shifts": async () => {
       if (!beeperOn()) return Response.json({ error: "Beeper is off on this machine" }, { status: 404 });
-      const kin = kinPeople(await kinState(vault)).map((p) => ({ name: p.name, ring: p.ring }));
+      const kin = kinPeople(await kinState(vault)).map((p) => ({ name: p.name, ring: p.ring, aka: p.aka }));
       const s = shifts(kin);
       return Response.json(s, { status: "error" in s ? 503 : 200 });
     },

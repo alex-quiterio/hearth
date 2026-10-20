@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import { join, basename } from "node:path";
 import { readdir, stat } from "node:fs/promises";
 import { garden, threadSections, parseTending } from "./garden";
+import { beeperOn, shifts } from "./beeper";
 
 // The vault is the single source of truth. Hearth only reads it; skills write it.
 
@@ -101,8 +102,30 @@ export type Person = {
   ring: string;
   /** A woe (Working On Excellence): the rhythm after "woe, ", "" if none given; null if not a woe. */
   woe: string | null;
+  /** Days between waterings from an "every <n> days|weeks|months" segment; null to use the ring's. */
+  every: number | null;
+  /** Days they can wait for an answer once they write, from "reply within <n> days"; null for the default. */
+  replyWithin: number | null;
+  /** Other names they show under on Beeper, from 'shows as "Sunny"' in the note. */
+  aka: string[];
   lastThread: string | null;
   draftsWaiting: number;
+};
+
+// Whole segments like "every 3 days", "every 2 weeks", "every month", "every fortnight",
+// and "reply within 1 day", "reply within 12 hours", "reply within a week".
+const SPAN = String.raw`(?:(\d+|an?)\s+)?(hour|day|week|fortnight|month)s?$`;
+const EVERY = new RegExp(`^every\\s+${SPAN}`, "i");
+const REPLY = new RegExp(`^reply\\s+within\\s+${SPAN}`, "i");
+const UNIT: Record<string, number> = { hour: 1 / 24, day: 1, week: 7, fortnight: 14, month: 30 };
+const spanDays = (seg: string, re: RegExp) => {
+  const m = seg.match(re)!;
+  return (/^\d/.test(m[1] ?? "") ? Number(m[1]) : 1) * UNIT[m[2]!.toLowerCase()]!;
+};
+/** Takes the first segment matching re out of parts, as days. */
+const takeSpan = (parts: string[], re: RegExp) => {
+  const at = parts.findIndex((p) => re.test(p.trim()));
+  return at < 0 ? null : spanDays(parts.splice(at, 1)[0]!.trim(), re);
 };
 
 function parsePerson(line: string, ring: string): Person {
@@ -115,6 +138,8 @@ function parsePerson(line: string, ring: string): Person {
   const rest = parts.slice(2);
   const woeAt = rest.findIndex((p) => /^woe\b/i.test(p.trim()));
   const woe = woeAt < 0 ? null : rest.splice(woeAt, 1)[0]!.trim().replace(/^woe,?\s*/i, "");
+  const every = takeSpan(rest, EVERY);
+  const replyWithin = takeSpan(rest, REPLY);
   return {
     name,
     linked: !!link,
@@ -123,6 +148,9 @@ function parsePerson(line: string, ring: string): Person {
     note: rest.join(" · ").trim(),
     ring,
     woe,
+    every,
+    replyWithin,
+    aka: [...line.matchAll(/shows as "([^"]+)"/gi)].map((m) => m[1]!),
     lastThread: null,
     draftsWaiting: 0,
   };
@@ -411,7 +439,10 @@ export async function state(vault: string, today?: string) {
     innerScreenState(vault),
     embersState(vault),
   ]);
-  const gardenState = await garden(vault, kinPeople(kin), config, today);
+  // Who wrote last on Beeper, for the reply clock: timestamps only, kin map people only.
+  const sh = beeperOn() ? shifts(kinPeople(kin).map((p) => ({ name: p.name, ring: p.ring, aka: p.aka }))) : null;
+  const chats = sh && !("error" in sh) ? sh.all.filter((c) => c.kin) : [];
+  const gardenState = await garden(vault, kinPeople(kin), config, today, chats);
   const woes = kinPeople(kin).filter((p) => p.woe != null).map((p) => ({ name: p.name, rhythm: p.woe, place: p.place }));
   return { vaultName: VAULT_NAME, config, kin, inner, tending, thinking: { ...thinking, woes }, innerScreen, embers, garden: gardenState, at: Date.now() };
 }

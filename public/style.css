@@ -556,6 +556,15 @@ button.build:hover { border-color: var(--muted); }
 .shift details { margin-top: 6px; } .shift details ul { margin-top: 6px; }
 .shift-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; font-size: 13px; }
 
+/* talk: replies long overdue */
+.reply-alert { border: 1px solid var(--clay); background: color-mix(in srgb, var(--clay) 10%, transparent); border-radius: 14px; padding: 10px 14px; margin: 4px 0 14px; }
+.reply-alert strong { color: var(--clay-ink); font-size: 14px; }
+.reply-alert ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.reply-alert li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 14px; }
+.reply-alert li small { color: var(--muted); font-size: 12.5px; }
+.reply-alert li button.name { border: 0; padding: 0; background: none; font: inherit; font-weight: 600; color: var(--ink); }
+.reply-alert li .tiny { margin-left: auto; }
+
 /* talk on a phone */
 @media (max-width: 640px) {
   .talk { padding: 14px 12px; }

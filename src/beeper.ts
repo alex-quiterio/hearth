@@ -79,20 +79,20 @@ export type Shift = {
   lastReceived: number;
 };
 export type Shifts =
-  | { at: number; warming: Shift[]; cooling: Shift[]; quiet: Shift[]; waiting: Shift[] }
+  | { at: number; warming: Shift[]; cooling: Shift[]; quiet: Shift[]; waiting: Shift[]; all: Shift[] }
   | { error: string };
 
 type ShiftRow = { account: string; name: string | null; recent: number; prior: number; lastSent: number | null; lastReceived: number | null };
 
-/** The kin map name for a Beeper name: the same name, every word of the map name, or a first name only one Beeper person has. */
-export function kinMatch(names: string[], kin: { name: string; ring: string }[]) {
+/** The kin map name for a Beeper name: the same name or an alias, every word of the map name, or a first name only one Beeper person has. */
+export function kinMatch(names: string[], kin: { name: string; ring: string; aka?: string[] }[]) {
   const words = (s: string) => key(s).split(" ").filter(Boolean);
   const firsts = new Map<string, number>();
   for (const n of names) firsts.set(words(n)[0] ?? "", (firsts.get(words(n)[0] ?? "") ?? 0) + 1);
   return (name: string) => {
     const w = words(name);
     return (
-      kin.find((k) => key(k.name) === key(name)) ??
+      kin.find((k) => key(k.name) === key(name) || k.aka?.some((a) => key(a) === key(name))) ??
       kin.find((k) => words(k.name).length > 1 && words(k.name).every((x) => w.includes(x))) ??
       kin.find((k) => words(k.name).length === 1 && words(k.name)[0] === w[0] && firsts.get(w[0]!) === 1) ??
       null
@@ -100,7 +100,7 @@ export function kinMatch(names: string[], kin: { name: string; ring: string }[])
   };
 }
 
-export function shifts(kin: { name: string; ring: string }[] = [], file = BEEPER_DB, now = Date.now()): Shifts {
+export function shifts(kin: { name: string; ring: string; aka?: string[] }[] = [], file = BEEPER_DB, now = Date.now()): Shifts {
   let db: Database;
   try {
     db = new Database(file, { readonly: true });
@@ -162,6 +162,7 @@ export function shifts(kin: { name: string; ring: string }[] = [], file = BEEPER
       // They wrote last, at least a day ago and within the month, and there is a history between you.
       waiting: all.filter((p) => p.lastReceived > p.lastSent && now - p.lastReceived > day && now - p.lastReceived < MONTH && p.lastSent > 0)
         .sort((a, b) => byKin(a, b) || a.lastReceived - b.lastReceived),
+      all,
     };
   } catch (e) {
     return { error: `Beeper's index changed shape: ${(e as Error).message}` };

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { cp, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { state, kinState, kinPeople } from "../src/vault";
-import { isoWeek, mapDate, thirstOf, threadState, waterPlant } from "../src/garden";
+import { garden, isoWeek, mapDate, thirstOf, threadState, waterPlant } from "../src/garden";
 
 const FIXTURE = join(import.meta.dir, "fixtures/vault");
 const TODAY = "2026-10-09";
@@ -71,6 +71,40 @@ describe("the garden", async () => {
       "2026-10-03", "2026-10-04", "2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09",
     ]);
     expect(s.garden.rhythm.filter((r) => r.active).map((r) => r.date)).toEqual(["2026-10-06", "2026-10-07"]);
+  });
+});
+
+describe("each person's clocks", () => {
+  const KIN = "4 - Archive/kin/Kin map.md";
+  const NOW = Date.parse("2026-10-09T12:00:00");
+  const H = 3_600_000;
+
+  test("every and reply within segments set the pace and leave the note", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "hearth-"));
+    await cp(FIXTURE, dir, { recursive: true });
+    const map = await Bun.file(join(dir, KIN)).text();
+    await Bun.write(join(dir, KIN), map.replace("Lena · ✈️ far (Berlin) · postcards.", "Lena · ✈️ far (Berlin) · every 3 weeks · reply within a day · postcards."));
+    const lena = kinPeople(await kinState(dir)).find((p) => p.name === "Lena")!;
+    expect(lena).toMatchObject({ every: 21, replyWithin: 1, note: "postcards." });
+    const ana = kinPeople(await kinState(dir)).find((p) => p.name === "Ana Exemplo")!;
+    expect(ana).toMatchObject({ every: null, replyWithin: null, woe: "weekly call" });
+  });
+
+  test("their unanswered message runs the reply clock; the worse clock shows", async () => {
+    const people = kinPeople(await kinState(FIXTURE)).map((p) =>
+      p.name === "Rui Teste" ? { ...p, replyWithin: 1 } : p.name === "Lena" ? { ...p, replyWithin: 7 } : p,
+    );
+    const chats = [
+      { kin: "Rui Teste", lastSent: NOW - 72 * H, lastReceived: NOW - 30 * H }, // 30h on a 1 day window
+      { kin: "Lena", lastSent: NOW - 72 * H, lastReceived: NOW - 30 * H }, // 30h on a week
+      { kin: "Tom Placeholder", lastSent: NOW - 2 * H, lastReceived: NOW - 30 * H }, // answered
+    ];
+    const g = await garden(FIXTURE, people, { pinned: [], watch: [] }, TODAY, chats, NOW);
+    const p = (n: string) => g.plants.find((x) => x.name === n)!;
+    // Rui was tended 2 days ago (fresh by pace), but his message is overdue.
+    expect(p("Rui Teste")).toMatchObject({ waitingSince: NOW - 30 * H, thirst: "thirsty" });
+    expect(p("Lena")).toMatchObject({ lastTended: "2026-10-06", lastTendedFrom: "beeper", replyWithin: 7, thirst: "fresh" });
+    expect(p("Tom Placeholder")).toMatchObject({ waitingSince: null, lastTendedFrom: "beeper", replyWithin: 5, thirst: "fresh" }); // close ring's window
   });
 });
 

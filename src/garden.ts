@@ -4,12 +4,24 @@ import { PATHS, md, type Person } from "./vault";
 
 // The garden: each person a plant, Alex's attention the water. Thirst is days since he
 // last tended someone over how often their bed wants water. It describes his care, never
-// the person: no scores, no ranking of friends.
+// the person: no scores, no ranking of friends. A "· every 3 weeks ·" segment on someone's
+// kin map line overrides their ring's interval.
+//
+// A second clock runs when they wrote last on Beeper: their message waits for an answer,
+// as long as their ring allows unless their line says "· reply within 1 day ·" or the like.
+// The plant shows whichever clock is further along.
 
 const INTERVAL: Record<string, number> = { core: 7, close: 14, warm: 30, new: 10, drifting: 45 };
+const REPLY_WITHIN: Record<string, number> = { core: 1, close: 5, warm: 7, new: 5, drifting: 7 };
+const WAIT_LIMIT = 30; // days; older unanswered messages fall back to the pace clock
 
 export type Thirst = "fresh" | "ok" | "thirsty" | "wilting" | "unknown";
-type Source = "thread" | "tending" | "water" | "map";
+type Source = "thread" | "tending" | "water" | "map" | "beeper";
+const RANK: Thirst[] = ["unknown", "fresh", "ok", "thirsty", "wilting"];
+const worse = (a: Thirst, b: Thirst) => (RANK.indexOf(a) >= RANK.indexOf(b) ? a : b);
+
+/** One Beeper chat with a kin map person: when each side last wrote, in ms. */
+export type Chat = { kin: string | null; lastSent: number; lastReceived: number };
 
 export const iso = (d: Date) => d.toLocaleDateString("sv-SE"); // YYYY-MM-DD, local time
 const days = (from: string, to: string) => Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000);
@@ -136,7 +148,7 @@ export function mapDate(note: string, today: string): string | null {
 
 type Config = { pinned: { name: string; why?: string }[]; watch: { name: string; why?: string; until?: unknown }[]; changesRaw?: string };
 
-export async function garden(vault: string, people: Person[], config: Config, today = iso(new Date())) {
+export async function garden(vault: string, people: Person[], config: Config, today = iso(new Date()), chats: Chat[] = [], now = Date.now()) {
   const logFile = Bun.file(join(vault, PATHS.tendingLog));
   const blocks = (await logFile.exists()) ? parseTending(await logFile.text()) : [];
   const week = currentBlock(blocks, today);
@@ -156,6 +168,12 @@ export async function garden(vault: string, people: Person[], config: Config, to
   for (const b of blocks) for (const e of b.entries) offer(e.name, tendedOn(e, b), e.kind === "Tended" ? "water" : "tending");
   for (const [k, t] of convo) for (const d of t.sent) offer(k, d, "thread");
   for (const p of people) offer(p.name, mapDate(p.note, today), "map");
+  const chatOf = new Map<string, Chat>();
+  for (const c of chats) {
+    if (!c.kin) continue;
+    chatOf.set(norm(c.kin), c);
+    if (c.lastSent) offer(c.kin, iso(new Date(c.lastSent)), "beeper");
+  }
 
   const byName = <T extends { name: string }>(list: T[]) => new Map(list.map((x) => [norm(x.name), x]));
   const pinned = byName(config.pinned ?? []);
@@ -166,16 +184,27 @@ export async function garden(vault: string, people: Person[], config: Config, to
   const plants = people.map((p) => {
     const k = norm(p.name);
     const w = water.get(k) ?? null;
-    const interval = INTERVAL[p.ring] ?? 30;
+    const interval = p.every ?? INTERVAL[p.ring] ?? 30;
     const daysSince = w ? days(w.date, today) : null;
     const wt = watch.get(k);
+    // Their last message, if it is newer than his, still within the month, and not answered
+    // off Beeper since: a later day, or marked tended here that same day. A thread dated the
+    // same day may be the message she answered, and Beeper's timestamps know better.
+    const c = chatOf.get(k);
+    const got = c ? iso(new Date(c.lastReceived)) : "";
+    const answeredElsewhere = !!c && !!w && w.from !== "beeper" && (w.date > got || (w.date === got && w.from === "water"));
+    const waiting = c && c.lastReceived > c.lastSent && now - c.lastReceived < WAIT_LIMIT * 86_400_000 && !answeredElsewhere ? c.lastReceived : null;
+    const replyWithin = p.replyWithin ?? REPLY_WITHIN[p.ring] ?? 7;
+    const pace = thirstOf(daysSince, interval);
     return {
       ...p,
       lastTended: w?.date ?? null,
       lastTendedFrom: w?.from ?? null,
       daysSince,
       interval,
-      thirst: thirstOf(daysSince, interval),
+      replyWithin,
+      waitingSince: waiting,
+      thirst: waiting ? worse(pace, thirstOf((now - waiting) / 86_400_000, replyWithin)) : pace,
       thisWeek: thisWeek.has(k),
       pinned: pinned.get(k)?.why ?? (pinned.has(k) ? "" : null),
       watch: wt ? { why: wt.why ?? "", until: wt.until ? String(wt.until instanceof Date ? iso(wt.until) : wt.until).slice(0, 10) : null } : null,
