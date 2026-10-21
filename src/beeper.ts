@@ -4,7 +4,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 // Who Alex talks to, counted from Beeper Desktop's local index. Read only, counts and
-// timestamps only: no message text leaves the database. Direct chats only; reactions,
+// timestamps only: the one exception is unread(), which passes the text of unread direct
+// messages to the Talk screen and stores nothing. Direct chats only; reactions,
 // membership and hidden events do not count as talking.
 
 export const BEEPER_DB = process.env.HEARTH_BEEPER_DB ?? join(homedir(), "Library/Application Support/BeeperTexts/index.db");
@@ -113,15 +114,16 @@ export function shifts(kin: { name: string; ring: string; aka?: string[] }[] = [
         `select t.accountID account,
            (select coalesce(nullif(p.full_name, ''), p.nickname) from participants p
              where p.room_id = m.roomID and coalesce(p.is_self, 0) = 0 and coalesce(p.is_network_bot, 0) = 0 limit 1) name,
-           sum(m.timestamp > ?1) recent, sum(m.timestamp <= ?1) prior,
+           sum(m.timestamp > ?1) recent, sum(m.timestamp <= ?1 and m.timestamp > ?2) prior,
            max(case when m.isSentByMe = 1 then m.timestamp end) lastSent,
            max(case when m.isSentByMe = 0 then m.timestamp end) lastReceived
          from mx_room_messages m join threads t on t.threadID = m.roomID
-         where json_extract(t.thread, '$.type') = 'single' and m.timestamp > ?2 and m.isDeleted = 0
-           and m.type in (${SPOKEN.map((_, i) => `?${i + 3}`).join(",")})
+         where json_extract(t.thread, '$.type') = 'single' and m.timestamp > ?3 and m.isDeleted = 0
+           and m.type in (${SPOKEN.map((_, i) => `?${i + 4}`).join(",")})
          group by m.roomID`,
       )
-      .all(now - MONTH, now - 4 * MONTH, ...SPOKEN) as ShiftRow[];
+      // The shift counts look back four months; last contact looks back a year, so slow kin still show a date.
+      .all(now - MONTH, now - 4 * MONTH, now - 12 * MONTH, ...SPOKEN) as ShiftRow[];
     const people = new Map<string, Shift & { prior: number }>();
     for (const r of rows) {
       if (!r.name) continue;
@@ -164,6 +166,83 @@ export function shifts(kin: { name: string; ring: string; aka?: string[] }[] = [
         .sort((a, b) => byKin(a, b) || a.lastReceived - b.lastReceived),
       all,
     };
+  } catch (e) {
+    return { error: `Beeper's index changed shape: ${(e as Error).message}` };
+  } finally {
+    db.close();
+  }
+}
+
+// ---- New messages: direct chats Beeper counts as unread ------------------------------------
+// The count is Beeper's own, so it matches the badge there; the lines are the newest unread ones.
+
+export type NewMessage = { at: number; type: string; text: string };
+export type Unread = {
+  name: string;
+  nets: string[];
+  ring: string | null;
+  kin: string | null;
+  count: number; // Beeper's unread count, reactions included
+  last: number;
+  reactions: string[]; // emoji they reacted with since Alex last read the chat
+  messages: NewMessage[]; // oldest first, at most SHOWN
+};
+export type Unreads = { at: number; chats: Unread[] } | { error: string };
+
+type UnreadRow = { room: string; account: string; name: string | null; count: number | null; readTo: number | null; at: number | null };
+type NewRow = { at: number; type: string; text: string | null; reaction: string | null };
+
+const SHOWN = 5;
+const MEDIA: Record<string, string> = { IMAGE: "📷 photo", VOICE: "🎤 voice note", AUDIO: "🎵 audio", VIDEO: "🎞 video", FILE: "📎 file", STICKER: "sticker", LOCATION: "📍 location", POLL: "📊 poll" };
+
+export function unread(kin: { name: string; ring: string; aka?: string[] }[] = [], file = BEEPER_DB, now = Date.now()): Unreads {
+  let db: Database;
+  try {
+    db = new Database(file, { readonly: true });
+  } catch (e) {
+    return { error: `Beeper's index is not readable at ${file}: ${(e as Error).message}` };
+  }
+  try {
+    const rooms = db
+      .query(
+        `select t.threadID room, t.accountID account,
+           (select coalesce(nullif(p.full_name, ''), p.nickname) from participants p
+             where p.room_id = t.threadID and coalesce(p.is_self, 0) = 0 and coalesce(p.is_network_bot, 0) = 0 limit 1) name,
+           json_extract(t.thread, '$.unreadCount') count, json_extract(t.thread, '$.lastReadMessageSortKey') readTo, t.timestamp at
+         from threads t
+         where json_extract(t.thread, '$.type') = 'single'
+           and (json_extract(t.thread, '$.unreadCount') > 0 or json_extract(t.thread, '$.isMarkedUnread') = 1)`,
+      )
+      .all() as UnreadRow[];
+    const lines = db.query(
+      `select timestamp at, type, text_content text, json_extract(message, '$.action.reactionKey') reaction
+       from mx_room_messages
+       where roomID = ? and isSentByMe = 0 and isDeleted = 0 and hsOrder > ?
+         and type in (${[...SPOKEN, "REACTION"].map(() => "?").join(",")})
+       order by hsOrder desc limit 40`,
+    );
+    const match = kinMatch(rooms.flatMap((r) => (r.name ? [r.name] : [])), kin);
+    const chats = new Map<string, Unread>();
+    for (const r of rooms) {
+      if (!r.name) continue;
+      const rows = (lines.all(r.room, r.readTo ?? 0, ...SPOKEN, "REACTION") as NewRow[]).reverse();
+      const k = match(r.name);
+      const id = k ? `kin:${k.name}` : key(r.name);
+      const net = r.account.split(".")[0]!;
+      const c = chats.get(id) ?? { name: k?.name ?? r.name, nets: [], ring: k?.ring ?? null, kin: k?.name ?? null, count: 0, last: 0, reactions: [], messages: [] };
+      if (!c.nets.includes(NETWORK[net] ?? net)) c.nets.push(NETWORK[net] ?? net);
+      // A chat marked unread by hand has no count; it still shows, as one.
+      c.count += Math.max(r.count ?? 0, 1);
+      c.last = Math.max(c.last, rows.at(-1)?.at ?? r.at ?? 0);
+      for (const m of rows) {
+        if (m.type === "REACTION") { if (m.reaction) c.reactions.push(m.reaction); continue; }
+        c.messages.push({ at: m.at, type: m.type, text: (m.text?.trim() || MEDIA[m.type] || m.type.toLowerCase()).slice(0, 400) });
+      }
+      chats.set(id, c);
+    }
+    for (const c of chats.values()) c.messages = c.messages.sort((a, b) => a.at - b.at).slice(-SHOWN);
+    // Kin map people first, then the newest.
+    return { at: now, chats: [...chats.values()].sort((a, b) => Number(!!b.ring) - Number(!!a.ring) || b.last - a.last) };
   } catch (e) {
     return { error: `Beeper's index changed shape: ${(e as Error).message}` };
   } finally {

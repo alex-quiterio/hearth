@@ -3,7 +3,7 @@ import { Database } from "bun:sqlite";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { talk, beeperOn, shifts } from "../src/beeper";
+import { talk, beeperOn, shifts, unread } from "../src/beeper";
 
 // A tiny Beeper index with just the columns talk() reads.
 function fixture() {
@@ -87,4 +87,38 @@ test("shifts: warming, cooling, quiet and waiting, matched and merged with the k
   expect(s.cooling.map((p) => p.name)).toEqual(["Ola Brandt"]);
   expect(s.quiet.map((p) => [p.name, p.ring])).toEqual([["Ivo", "close"]]);
   expect(s.waiting.map((p) => [p.name, p.ring, p.nets])).toEqual([["Mira Solis", "core", ["signal", "whatsapp"]]]);
+});
+
+test("unread: Beeper's count, the newest unread lines and reactions, merged with the kin map", () => {
+  const file = join(mkdtempSync(join(tmpdir(), "beeper-")), "index.db");
+  const db = new Database(file);
+  db.run(`create table threads (threadID text primary key, accountID text, thread json, timestamp int)`);
+  db.run(`create table participants (account_id text, room_id text, id text, full_name text, nickname text, is_self int, is_network_bot int)`);
+  db.run(`create table mx_room_messages (roomID text, timestamp int, hsOrder int, isDeleted int, type text, isSentByMe int, text_content text, message json)`);
+  const room = (id: string, name: string, thread: object, account = "whatsapp.1", type = "single") => {
+    db.run(`insert into threads values (?, ?, ?, ?)`, [id, account, JSON.stringify({ type, ...thread }), NOW]);
+    db.run(`insert into participants values (?, ?, ?, ?, null, 0, 0)`, [account, id, `@${id}`, name]);
+  };
+  let order = 0;
+  const msg = (room: string, mins: number, type: string, text: string | null, me = 0, reaction?: string) =>
+    db.run(`insert into mx_room_messages values (?, ?, ?, 0, ?, ?, ?, ?)`,
+      [room, NOW - mins * 60_000, ++order, type, me, text, JSON.stringify(reaction ? { action: { reactionKey: reaction } } : {})]);
+  room("a", "Mira Solis", { unreadCount: 3, lastReadMessageSortKey: 1 });
+  msg("a", 60, "TEXT", "read already");                 // order 1, read
+  msg("a", 30, "TEXT", "are you free sunday?");
+  msg("a", 20, "IMAGE", null);
+  msg("a", 10, "REACTION", null, 0, "❤️");
+  room("b", "Nova Reyes", { unreadCount: 0 });           // all read: not shown
+  msg("b", 5, "TEXT", "hi");
+  room("c", "Ola Brandt", { unreadCount: 0, isMarkedUnread: true }, "signal.1");
+  room("g", "Group", { unreadCount: 9 }, "whatsapp.1", "group");
+  msg("g", 1, "TEXT", "group chatter");
+  db.close();
+  const u = unread([{ name: "Ola Brandt", ring: "warm" }], file, NOW);
+  if ("error" in u) throw new Error(u.error);
+  expect(u.chats.map((c) => [c.name, c.ring, c.count])).toEqual([["Ola Brandt", "warm", 1], ["Mira Solis", null, 3]]);
+  const mira = u.chats[1]!;
+  expect(mira.messages.map((m) => m.text)).toEqual(["are you free sunday?", "📷 photo"]);
+  expect(mira.reactions).toEqual(["❤️"]);
+  expect(mira.last).toBe(NOW - 10 * 60_000);
 });

@@ -434,6 +434,8 @@ let talkDays = 90;
 let talkTimer = null;
 let T = null;
 let SH = null; // shifts: warming, cooling, quiet, waiting
+let UN = null; // direct chats with unread messages
+let unreadOpen = false; // the To be read section stays as Alex left it across the minute's refetch
 const DAY_MS = 86_400_000;
 const n0 = (n) => n.toLocaleString("en");
 const agoMs = (t) => { const d = Math.floor((Date.now() - t) / DAY_MS); return d <= 0 ? "today" : d === 1 ? "yesterday" : `${d} days ago`; };
@@ -446,12 +448,14 @@ async function loadTalk() {
 }
 async function fetchTalk() {
   try {
-    const [res, sh] = await Promise.all([fetch(`/api/talk?days=${talkDays}`), fetch("/api/shifts").catch(() => null)]);
+    const [res, sh, un] = await Promise.all([fetch(`/api/talk?days=${talkDays}`), fetch("/api/shifts").catch(() => null), fetch("/api/unread").catch(() => null)]);
     const t = await res.json();
     if (t.error) throw new Error(t.error);
     T = t;
     const s = sh?.ok ? await sh.json() : null;
     SH = s && !s.error ? s : null;
+    const u = un?.ok ? await un.json() : null;
+    UN = u && !u.error ? u : null;
   } catch (e) {
     $("#talkScreen").innerHTML = `<section class="panel talk"><h2>Who I talk to</h2><p class="muted">${esc(e.message)}</p></section>`;
     return;
@@ -510,10 +514,34 @@ function replyAlert() {
     <ul>${late.map(li).join("")}</ul></div>`;
 }
 
+// Unread direct chats, folded by default: who wrote, how many, and the newest unread lines.
+function unreadSection() {
+  if (!UN) return "";
+  const C = UN.chats;
+  const total = C.reduce((a, c) => a + c.count, 0);
+  const when = (t) => {
+    const d = new Date(t), today = new Date().toDateString() === d.toDateString();
+    return today ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString([], { day: "numeric", month: "short" });
+  };
+  const chat = (c) => {
+    const name = c.ring ? `<button class="name" data-sheet="${esc(c.kin)}">${esc(c.name)}</button>` : `<span class="name">${esc(c.name)}</span>`;
+    const reacted = c.reactions.length ? `<li class="reacted">reacted ${esc(c.reactions.join(" "))}</li>` : "";
+    const lines = c.messages.map((m) => `<li><time>${esc(when(m.at))}</time><span class="${m.type === "TEXT" ? "" : "media"}">${esc(m.text)}</span></li>`).join("");
+    return `<li class="unread-chat"><div class="unread-head">${name}${c.ring ? `<span class="ring-tag">${esc(c.ring)}</span>` : ""}
+        <small>${c.count} new · ${esc(c.nets.join(", "))} · ${esc(agoMs(c.last))}</small>
+        <button class="tiny ghost" data-run="${esc(`/beeper:thread-reply ${c.name}`)}" title="Draft a reply">Reply</button></div>
+      ${lines || reacted ? `<ul class="unread-lines">${lines}${reacted}</ul>` : ""}</li>`;
+  };
+  return `<details class="unread"${unreadOpen ? " open" : ""}><summary>To be read <span class="count">${total}</span>
+      <span class="sub">${C.length ? `from ${C.length === 1 ? "1 person" : `${C.length} people`}` : "none, all read"}</span></summary>
+    ${C.length ? `<ul class="unread-list">${C.map(chat).join("")}</ul><p class="muted">Unread as Beeper counts it, direct chats only. Kin map people first; tap one to open them.</p>` : ""}</details>`;
+}
+
 function renderTalk() {
   const P = T.people, N = P.length;
   const head = `<h2>Who I talk to <span class="sub">direct chats on Beeper · updated ${new Date(T.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></h2>
     ${replyAlert()}
+    ${unreadSection()}
     <div class="talk-bar"><div class="talk-days" role="group" aria-label="Time window">${[7, 30, 90, 365].map((d) => `<button class="ghost" data-talk-days="${d}" aria-pressed="${d === talkDays}">${d === 7 ? "Last week" : d === 365 ? "1 year" : `${d} days`}</button>`).join("")}</div>
     <button class="ghost" data-talk-refresh title="Count again from Beeper">↻ Refresh</button></div>`;
   if (!N) { $("#talkScreen").innerHTML = `<section class="panel talk">${head}<p class="muted">No direct messages in this window.</p></section>`; return; }
@@ -597,6 +625,8 @@ $("#talkScreen").addEventListener("click", (e) => {
   const d = e.target.closest("[data-talk-days]");
   if (d) { talkDays = Number(d.dataset.talkDays); loadTalk(); }
   if (e.target.closest("[data-talk-refresh]")) fetchTalk();
+  // The toggle lands after this click, so read the state on the next tick.
+  if (e.target.closest("details.unread > summary")) setTimeout(() => { unreadOpen = !!$("#talkScreen details.unread")?.open; });
 });
 // The card for a dot or a bar, under the pointer or finger, kept inside the screen.
 function showTalkTip(e) {

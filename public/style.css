@@ -564,6 +564,20 @@ button.build:hover { border-color: var(--muted); }
 .reply-alert li small { color: var(--muted); font-size: 12.5px; }
 .reply-alert li button.name { border: 0; padding: 0; background: none; font: inherit; font-weight: 600; color: var(--ink); }
 .reply-alert li .tiny { margin-left: auto; }
+.talk details.unread { border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; margin: 4px 0 14px; }
+.talk details.unread > summary { font: 600 15px Fraunces, Georgia, serif; color: var(--ink); }
+.unread summary .count { font: 600 12px Inter, sans-serif; color: var(--ink-2); background: var(--surface-2); border-radius: 999px; padding: 1px 8px; margin-left: 4px; }
+.unread summary .sub { font: 500 13px Inter, sans-serif; color: var(--muted); margin-left: 6px; }
+.unread-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 12px; }
+.unread-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 14px; }
+.unread-head .name { border: 0; padding: 0; background: none; font: inherit; font-weight: 600; color: var(--ink); }
+.unread-head small { color: var(--muted); font-size: 12.5px; }
+.unread-head .tiny { margin-left: auto; }
+.unread .ring-tag { font-size: 11px; text-transform: lowercase; color: var(--ink-2); background: var(--surface-2); border-radius: 999px; padding: 0 7px; }
+.unread-lines { list-style: none; margin: 6px 0 0; padding: 0 0 0 10px; border-left: 2px solid var(--line); display: grid; gap: 4px; font-size: 13.5px; }
+.unread-lines li { display: flex; gap: 8px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.unread-lines time { flex: none; color: var(--muted); font-size: 12px; min-width: 42px; }
+.unread-lines .media, .unread-lines .reacted { color: var(--ink-2); font-style: italic; }
 
 /* talk on a phone */
 @media (max-width: 640px) {
