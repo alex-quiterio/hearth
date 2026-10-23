@@ -1173,9 +1173,14 @@ function addStep(name, detail = "") {
   scrollLog();
 }
 
+/* A reply that ends in [[confirm]] is a yes or no question: the marker is hidden and Yes / No buttons follow the turn.
+   While it streams, a half-written marker at the end is hidden too. */
+const CONFIRM = /\s*\[\[confirm\]\]\s*$/;
+const unmark = (t) => t.replace(CONFIRM, "").replace(/\s*\[\[[a-z]{0,7}\]?$/, "");
+
 function light(text) {
   // Escape first, then a little markdown: bold, italics, bullets, paragraphs.
-  const blocks = esc(text).split(/\n{2,}/);
+  const blocks = esc(unmark(text)).split(/\n{2,}/);
   return blocks.map((b) => {
     const lines = b.split("\n");
     if (lines.every((l) => /^\s*([-*]|\d+\.)\s/.test(l)))
@@ -1404,12 +1409,25 @@ function offerRetry(message) {
   $("button", retryEl).onclick = () => send(message, true);
 }
 
+/* Yes / No under a reply that asked one. A press answers with that word; typing an answer instead takes the buttons away.
+   They only answer Claude: a Beeper change it then makes still meets the Allow card unless Auto-allow covers it. */
+let confirmEl = null;
+let asked = false;
+
+function offerConfirm() {
+  confirmEl = append("confirm", `<div class="chat-buttons"><button type="button" class="ghost" data-no>No</button><button type="button" class="primary" data-yes>Yes</button></div>`);
+  // send() takes the buttons away and shows the word as his message.
+  $("[data-yes]", confirmEl).onclick = () => running || send("Yes");
+  $("[data-no]", confirmEl).onclick = () => running || send("No");
+}
+
 async function send(message, again = false) {
   if (!message.trim()) return;
   if (running) { queue.push(message.trim()); renderQueue(); return; }
   stopAsked = false;
   retryEl?.remove(); retryEl = null;
-  replied = failed = false;
+  confirmEl?.remove(); confirmEl = null;
+  replied = failed = asked = false;
   if (!again) copyable(append("msg user", esc(message)), message);
   bubble = null; bubbleText = "";
   setRunning(true);
@@ -1441,6 +1459,7 @@ async function send(message, again = false) {
     waitingPermissions = 0;
     setRunning(false);
     if ((failed || !replied) && !stopAsked) offerRetry(message);
+    else if (asked && !stopAsked && !queue.length) offerConfirm();
     flushQueue();
   }
 }
@@ -1455,7 +1474,7 @@ function handle(ev) {
       if (!bubble) bubble = append("msg assistant", "");
       bubbleText += ev.delta;
       bubble.innerHTML = light(bubbleText);
-      copyable(bubble, bubbleText);
+      copyable(bubble, unmark(bubbleText));
       if (work) $("#log").appendChild(work);
       scrollLog();
       break;
@@ -1494,6 +1513,7 @@ function handle(ev) {
     }
     case "done":
       if (ev.isError) { failed = true; append("msg error", esc(ev.result || "The turn ended with an error.")); }
+      asked = !!bubble && CONFIRM.test(bubbleText);
       append("stamp", new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
       break;
     case "error": failed = true; append("msg error", esc(ev.message)); break;
@@ -1681,7 +1701,7 @@ async function openSession(id) {
   $("#log").innerHTML = `<p class="muted hint">An earlier conversation. Write below to continue it.</p>`;
   for (const l of lines) {
     if (l.kind === "user") copyable(append("msg user", esc(l.text)), l.text);
-    else if (l.kind === "assistant") copyable(append("msg assistant", light(l.text)), l.text);
+    else if (l.kind === "assistant") copyable(append("msg assistant", light(l.text)), unmark(l.text));
     else { const [name, ...rest] = l.text.split(" · "); addStep(name, rest.join(" · ")); }
   }
   $("#chatStatus").textContent = "continuing";

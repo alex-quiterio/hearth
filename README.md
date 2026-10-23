@@ -91,6 +91,11 @@ The ⚡ Auto-allow button next to Send steps through three settings, remembered 
 sends included, still asks) and **on** (Beeper sends go through too; other Beeper changes
 still ask).
 
+When Claude stops on a yes or no question ("send this one?"), it ends the reply with `[[confirm]]`,
+which the page hides, and **Yes** and **No** buttons appear under it. A press sends that word as
+your answer; typing instead takes the buttons away. They answer Claude, not the card: a Beeper
+send that follows still asks unless Auto-allow is on.
+
 ## Login
 
 `bun run password` sets a password (and changing it logs out every browser). From then on
