@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { state, md, servers } from "../src/vault";
+import { state, md, servers, birthdayOf } from "../src/vault";
 
 const VAULT = join(import.meta.dir, "fixtures/vault");
 const s = await state(VAULT);
@@ -29,6 +29,15 @@ describe("kin map", () => {
       "here",
       "far",
     ]);
+  });
+
+  test("birthdays become MM-DD, in English or Portuguese, and only when a day and month follow", () => {
+    expect([person("Tom Placeholder").birthday, person("Marco Silent").birthday, person("Lena").birthday]).toEqual(["10-14", "01-02", null]);
+    expect(birthdayOf("🎂 29 Feb")).toBe("02-29");
+    expect(birthdayOf("faz anos a 3 de Março")).toBe("03-03");
+    expect(birthdayOf("aniversário 31 Out")).toBe("10-31");
+    expect(birthdayOf("his birthday message on 16 Oct")).toBeNull();
+    expect(birthdayOf("a birthday at Rosa's Cantina")).toBeNull();
   });
 
   test("weak points and other sections are kept apart from rings", () => {

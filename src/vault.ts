@@ -108,6 +108,8 @@ export type Person = {
   replyWithin: number | null;
   /** Other names they show under on Beeper, from 'shows as "Sunny"' in the note. */
   aka: string[];
+  /** Their birthday as MM-DD, from "birthday 31 Oct", "born 2 Jan 1990" or "🎂 31 Oct" in the note; null if not given. */
+  birthday: string | null;
   lastThread: string | null;
   draftsWaiting: number;
 };
@@ -127,6 +129,18 @@ const takeSpan = (parts: string[], re: RegExp) => {
   const at = parts.findIndex((p) => re.test(p.trim()));
   return at < 0 ? null : spanDays(parts.splice(at, 1)[0]!.trim(), re);
 };
+
+// "Birthday 31 Oct", "born 2 January 1990", "🎂 31 Oct", "aniversário 31 Out", with an optional "on".
+const MONTH_STEMS = ["jan", "feb|fev", "mar", "apr|abr", "may|mai", "jun", "jul", "aug|ago", "sep|set", "oct|out", "nov", "dec|dez"];
+const BIRTHDAY = /(?:birthday|born|🎂|anivers[aá]rio|anos)\s*(?:on\s+|a\s+|em\s+)?(\d{1,2})\s+(?:de\s+)?(\p{L}{3})\p{L}*/iu;
+export function birthdayOf(line: string): string | null {
+  const m = line.match(BIRTHDAY);
+  if (!m) return null;
+  const month = MONTH_STEMS.findIndex((s) => s.split("|").includes(m[2]!.toLowerCase()));
+  const d = Number(m[1]);
+  if (month < 0 || d < 1 || d > 31) return null;
+  return `${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
 
 function parsePerson(line: string, ring: string): Person {
   const parts = line.split(" · ");
@@ -151,6 +165,7 @@ function parsePerson(line: string, ring: string): Person {
     every,
     replyWithin,
     aka: [...line.matchAll(/shows as "([^"]+)"/gi)].map((m) => m[1]!),
+    birthday: birthdayOf(line),
     lastThread: null,
     draftsWaiting: 0,
   };

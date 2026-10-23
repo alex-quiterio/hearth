@@ -151,7 +151,7 @@ function render() {
   // Inner work and practice live on the Inner screen; the kin screen keeps the rest, in config order.
   const byPanel = { focus: frostSection, "weak-points": weatherSection, rings: bedsSection };
   const rest = config.panels.filter((p) => byPanel[p]).map((p) => byPanel[p]());
-  $("#sections").innerHTML = [wateringSection(), askingSection(), ...rest, journalSection()].join("");
+  $("#sections").innerHTML = [wateringSection(), askingSection(), birthdaysSection(), ...rest, journalSection()].join("");
   $("#innerScreen").innerHTML = innerScreen();
   showScreen();
   window.scrollTo(0, y);
@@ -251,9 +251,11 @@ function plantSvg(p, x, y) {
     p.pinned != null ? `<ellipse class="stone" cx="-13" cy="1" rx="5" ry="3.5"/>` : "",
     p.watch ? `<g class="flag ${until != null && until <= 7 ? "near" : ""}" transform="translate(12 0)"><path d="M0 0 V-16"/><path class="ribbon" d="M0 -16 L8 -13 L0 -10Z"/></g>` : "",
     p.thisWeek ? drop(p) : "",
+    p.nextBirthday && p.nextBirthday.in <= SOON ? candle() : "",
   ].join("");
 
-  const label = `${p.name}, ${RING_NAME[p.ring]}, ${sinceText(p)}${p.thisWeek ? ", in this week's tending" : ""}`;
+  const bday = p.nextBirthday && p.nextBirthday.in <= SOON ? `, birthday ${birthdayWhen(p.nextBirthday.in)}` : "";
+  const label = `${p.name}, ${RING_NAME[p.ring]}, ${sinceText(p)}${p.thisWeek ? ", in this week's tending" : ""}${bday}`;
   return `<g class="plant t-${th} ring-${p.ring}" transform="translate(${x.toFixed(1)} ${y.toFixed(1)})" tabindex="0" role="button" data-plant="${esc(p.name)}" aria-label="${esc(label)}">
     <circle class="hit" r="${24 * s}" cy="${-12 * s}"/>
     <ellipse class="soil" cx="0" cy="2" rx="${11 * s}" ry="${3 * s}"/>
@@ -269,6 +271,9 @@ function drop(p) {
   return `<path class="drop ${done ? "done" : ""}" d="M0 -6 C 3 -2, 4 1, 0 4 C -4 1, -3 -2, 0 -6Z" transform="translate(-14 -24) scale(1.2)"/>`;
 }
 
+const CANDLE = `<rect class="candle" x="-1.5" y="-6" width="3" height="7" rx="1"/><path class="candle-flame" d="M0 -11 C 2 -8.5, 2 -7, 0 -6.5 C -2 -7, -2 -8.5, 0 -11Z"/>`;
+const candle = () => `<g class="bday" transform="translate(14 -20)">${CANDLE}</g>`;
+
 function legend() {
   const sw = (cls, label) => `<span class="lg"><svg viewBox="-12 -24 24 30" width="18" height="22" aria-hidden="true"><g class="plant t-${cls} ring-close"><g transform="scale(.75)">${
     cls === "unknown" ? `<ellipse class="seed" cx="0" cy="-3" rx="5" ry="3.6"/>` :
@@ -280,6 +285,7 @@ function legend() {
       <span class="lg"><svg viewBox="-6 -7 12 12" width="12" height="12" aria-hidden="true"><path class="drop" d="M0 -6 C 3 -2, 4 1, 0 4 C -4 1, -3 -2, 0 -6Z"/></svg>this week's tending</span>
       <span class="lg"><svg viewBox="-6 -5 12 10" width="12" height="10" aria-hidden="true"><ellipse class="stone" rx="5" ry="3.5"/></svg>pinned</span>
       <span class="lg"><svg viewBox="-2 -18 12 20" width="10" height="16" aria-hidden="true"><g class="flag"><path d="M0 0 V-16"/><path class="ribbon" d="M0 -16 L8 -13 L0 -10Z"/></g></svg>watching</span>
+      <span class="lg"><svg viewBox="-4 -12 8 14" width="8" height="14" aria-hidden="true"><g class="bday">${CANDLE}</g></svg>birthday within ${SOON} days</span>
     </div>
     <div class="lg-row"><span class="lg-title">Place</span>${places}</div>`;
 }
@@ -328,6 +334,27 @@ function askingSection() {
       <span class="ops"><button class="water tiny" data-water="${esc(p.name)}">Tended</button><button class="tiny" data-run="/kin:tend focus on ${esc(p.name)}">Tend</button></span>
       <span class="wave" aria-hidden="true"></span></div>`)
     .join("")}</div></section>`;
+}
+
+const BIRTHDAY_AHEAD = 45; // days of birthdays the Kin screen looks ahead
+const SOON = 14; // a birthday this close puts a candle on the plant
+const birthdayWhen = (n) => (n === 0 ? "today" : n === 1 ? "tomorrow" : `in ${n} days`);
+const birthdayDay = (date) => new Date(date + "T12:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+
+function birthdaysSection() {
+  const ahead = G.plants
+    .filter((p) => p.nextBirthday && p.nextBirthday.in <= BIRTHDAY_AHEAD)
+    .sort((a, b) => a.nextBirthday.in - b.nextBirthday.in);
+  if (!ahead.length) return "";
+  return `<section class="panel"><h2>Birthdays ahead <span class="sub">the next ${BIRTHDAY_AHEAD} days</span></h2><ul class="frost">${ahead
+    .map((p) => {
+      const b = p.nextBirthday;
+      return `<li class="${b.in <= 7 ? "near" : ""}"><button class="linkish name" data-sheet="${esc(p.name)}">🎂 ${esc(p.name)}</button>
+        <span class="when">${esc(birthdayDay(b.date))} · ${birthdayWhen(b.in)}</span>
+        <span class="ops"><button class="tiny" data-run="/beeper:thread-reply ${esc(p.name)} — their birthday is ${esc(b.date)}${b.in ? ` (${birthdayWhen(b.in)})` : " (today)"}">Write</button></span>
+        <div class="why muted">${esc(RING_NAME[p.ring])} · ${esc(sinceText(p))}</div></li>`;
+    })
+    .join("")}</ul></section>`;
 }
 
 function frostSection() {
@@ -976,6 +1003,7 @@ function openSheet(name) {
     <p class="muted">${esc(RING_NAME[p.ring])}${p.placeLabel ? ` · ${esc(p.placeLabel)}` : ""} · every ${spanText(p.interval)}${p.replyWithin ? `, reply within ${spanText(p.replyWithin)}` : ""}</p>
     <p class="since-line t-${esc(p.thirst)}"><i class="tdot t-${esc(p.thirst)}"></i>${esc(sinceText(p))}${p.lastTendedFrom ? ` <span class="muted">· from ${esc(FROM[p.lastTendedFrom] ?? p.lastTendedFrom)}</span>` : ""}</p>
     ${p.note ? `<p class="note">${esc(p.note.replace(/\[\[([^\]|]+)(\|[^\]]+)?\]\]/g, "$1"))}</p>` : ""}
+    ${p.nextBirthday ? `<p class="muted">🎂 ${esc(birthdayDay(p.nextBirthday.date))} · ${birthdayWhen(p.nextBirthday.in)}</p>` : ""}
     ${p.draftsWaiting ? `<p><span class="badge">${p.draftsWaiting} draft${p.draftsWaiting > 1 ? "s" : ""} not fully sent</span></p>` : ""}
     ${w ? `<div class="sheet-box">${kindChip(w.kind)} <strong>This week</strong><p>${esc(w.gesture)}</p>${w.done ? `<p class="outcome">✓ ${esc(w.outcome || "tended")}</p>` : ""}</div>` : ""}
     ${p.pinned ? `<div class="sheet-box"><strong>Pinned</strong><p>${esc(p.pinned)}</p></div>` : ""}

@@ -144,6 +144,18 @@ export function mapDate(note: string, today: string): string | null {
   return d;
 }
 
+/** The next time a MM-DD birthday falls, today included, and how many days off. 29 Feb falls on 28 Feb in other years. */
+export function nextBirthday(mmdd: string | null, today: string): { date: string; in: number } | null {
+  if (!mmdd) return null;
+  const on = (year: number) => {
+    const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+    return `${year}-${mmdd === "02-29" && !leap ? "02-28" : mmdd}`;
+  };
+  const year = Number(today.slice(0, 4));
+  const date = on(year) >= today ? on(year) : on(year + 1);
+  return { date, in: days(today, date) };
+}
+
 // ---- The garden -----------------------------------------------------------------------
 
 type Config = { pinned: { name: string; why?: string }[]; watch: { name: string; why?: string; until?: unknown }[]; changesRaw?: string };
@@ -206,6 +218,7 @@ export async function garden(vault: string, people: Person[], config: Config, to
       waitingSince: waiting,
       thirst: waiting ? worse(pace, thirstOf((now - waiting) / 86_400_000, replyWithin)) : pace,
       thisWeek: thisWeek.has(k),
+      nextBirthday: nextBirthday(p.birthday, today),
       pinned: pinned.get(k)?.why ?? (pinned.has(k) ? "" : null),
       watch: wt ? { why: wt.why ?? "", until: wt.until ? String(wt.until instanceof Date ? iso(wt.until) : wt.until).slice(0, 10) : null } : null,
     };

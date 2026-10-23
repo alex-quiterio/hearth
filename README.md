@@ -55,6 +55,14 @@ pandora vault ──read──▶ hearth (Bun server) ──▶ browser dashboar
   change under `## Changes`. The "Tend the hearth" button asks Claude to reshape it on
   purpose.
 
+## Birthdays
+
+A Kin map line that says "birthday 31 Oct", "born 2 January 1990", "🎂 31 Oct" or "faz anos a 3 de
+Março" gives that person a birthday. The Kin screen lists **Birthdays ahead** for the next 45 days,
+each with a Write button that hands the date to `/beeper:thread-reply`; a birthday within two weeks
+puts a small candle on their plant, and their sheet shows the next one. 29 Feb falls on 28 Feb in
+other years.
+
 ## Talk
 
 📊 Talk (`#talk`) counts direct messages from Beeper Desktop's local index, read only and never

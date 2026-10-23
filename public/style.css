@@ -124,6 +124,9 @@ h1::before { content: ""; display: inline-block; width: 12px; height: 12px; bord
 .flag path:first-child { stroke: var(--ink-2); }
 .flag .ribbon { fill: var(--amber); }
 .flag.near .ribbon { fill: var(--clay); }
+.bday .candle { fill: var(--bloom); stroke: var(--surface); stroke-width: .6; }
+.bday .candle-flame { fill: var(--amber); }
+.frost li .ops { display: inline-flex; margin: 0 0 0 8px; vertical-align: middle; }
 .drop { fill: none; stroke: var(--water); stroke-width: 1.4; }
 .drop.done { fill: var(--water); }
 .plabel { font: 500 12.5px Inter, sans-serif; fill: var(--ink-2); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; pointer-events: none; }

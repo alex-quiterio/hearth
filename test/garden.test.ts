@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { cp, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { state, kinState, kinPeople } from "../src/vault";
-import { garden, isoWeek, mapDate, thirstOf, threadState, waterPlant } from "../src/garden";
+import { garden, isoWeek, mapDate, nextBirthday, thirstOf, threadState, waterPlant } from "../src/garden";
 
 const FIXTURE = join(import.meta.dir, "fixtures/vault");
 const TODAY = "2026-10-09";
@@ -31,6 +31,14 @@ describe("pieces", () => {
     expect(threadState("Estado: **all chunks sent**, às 00:16")).toBe("sent");
     expect(threadState("Estado: **rascunho, não enviado**")).toBe("draft");
     expect(threadState("no state here")).toBeNull();
+  });
+
+  test("the next birthday is today or later, wrapping the year, and 29 Feb falls on 28 Feb", () => {
+    expect(nextBirthday("10-14", TODAY)).toEqual({ date: "2026-10-14", in: 5 });
+    expect(nextBirthday("10-09", TODAY)).toEqual({ date: "2026-10-09", in: 0 });
+    expect(nextBirthday("01-02", TODAY)).toEqual({ date: "2027-01-02", in: 85 });
+    expect(nextBirthday("02-29", TODAY)).toEqual({ date: "2027-02-28", in: 142 });
+    expect(nextBirthday(null, TODAY)).toBeNull();
   });
 
   test("ISO weeks", () => {

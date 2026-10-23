@@ -14,7 +14,7 @@ updated: 2026-10-01
 ## 🤝 Close (sees him, knows what he is carrying)
 
 - [[Inês Feijão]] · 🌳 near the land (Sintra) · carpentry, forest.
-- [[Tom Placeholder]] · 🏙️ here · climbing on Thursdays.
+- [[Tom Placeholder]] · 🏙️ here · climbing on Thursdays, birthday 14 Oct.
 
 ## ☀️ Warm (glad to see each other)
 
@@ -22,7 +22,7 @@ updated: 2026-10-01
 
 ## 🍂 Drifting (was close or warm, no real contact in 3+ months)
 
-- [[Marco Silent]] · ✈️ far · since May.
+- [[Marco Silent]] · ✈️ far · since May, born 2 January 1990.
 
 ## 🌱 New (met in the last 6 months)
 
