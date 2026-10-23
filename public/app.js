@@ -1392,11 +1392,25 @@ function syncProposal() {
   $(".proposal-note", proposal).hidden = !running;
 }
 
-async function send(message) {
+/* A turn that failed or ended without a word gets a Retry under it, which sends the same message again.
+   After Stop it does not: stopping was the point. */
+let retryEl = null;
+let replied = false;
+let failed = false;
+
+function offerRetry(message) {
+  retryEl = append("retry", `<span class="muted">${failed ? "That did not go through." : "No reply came back."}</span>
+    <button type="button" class="ghost">Retry</button>`);
+  $("button", retryEl).onclick = () => send(message, true);
+}
+
+async function send(message, again = false) {
   if (!message.trim()) return;
   if (running) { queue.push(message.trim()); renderQueue(); return; }
   stopAsked = false;
-  copyable(append("msg user", esc(message)), message);
+  retryEl?.remove(); retryEl = null;
+  replied = failed = false;
+  if (!again) copyable(append("msg user", esc(message)), message);
   bubble = null; bubbleText = "";
   setRunning(true);
   try {
@@ -1421,10 +1435,12 @@ async function send(message) {
       }
     }
   } catch (e) {
+    failed = true;
     append("msg error", esc(e.message));
   } finally {
     waitingPermissions = 0;
     setRunning(false);
+    if ((failed || !replied) && !stopAsked) offerRetry(message);
     flushQueue();
   }
 }
@@ -1435,6 +1451,7 @@ function handle(ev) {
     case "status": if (ev.text === "stopped") setActivity("Stopping"); break;
     case "activity": setActivity(ev.text); break;
     case "text":
+      replied = true;
       if (!bubble) bubble = append("msg assistant", "");
       bubbleText += ev.delta;
       bubble.innerHTML = light(bubbleText);
@@ -1476,10 +1493,10 @@ function handle(ev) {
       break;
     }
     case "done":
-      if (ev.isError) append("msg error", esc(ev.result || "The turn ended with an error."));
+      if (ev.isError) { failed = true; append("msg error", esc(ev.result || "The turn ended with an error.")); }
       append("stamp", new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
       break;
-    case "error": append("msg error", esc(ev.message)); break;
+    case "error": failed = true; append("msg error", esc(ev.message)); break;
   }
 }
 
