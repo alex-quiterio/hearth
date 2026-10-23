@@ -89,7 +89,7 @@ test("shifts: warming, cooling, quiet and waiting, matched and merged with the k
   expect(s.waiting.map((p) => [p.name, p.ring, p.nets])).toEqual([["Mira Solis", "core", ["signal", "whatsapp"]]]);
 });
 
-test("unread: Beeper's count, the newest unread lines and reactions, merged with the kin map", () => {
+test("unread: Beeper's count, the newest unread lines and reactions, kin map people only", () => {
   const file = join(mkdtempSync(join(tmpdir(), "beeper-")), "index.db");
   const db = new Database(file);
   db.run(`create table threads (threadID text primary key, accountID text, thread json, timestamp int)`);
@@ -113,10 +113,12 @@ test("unread: Beeper's count, the newest unread lines and reactions, merged with
   room("c", "Ola Brandt", { unreadCount: 0, isMarkedUnread: true }, "signal.1");
   room("g", "Group", { unreadCount: 9 }, "whatsapp.1", "group");
   msg("g", 1, "TEXT", "group chatter");
+  room("s", "Some Stranger", { unreadCount: 2 });        // not on the kin map: not shown
+  msg("s", 2, "TEXT", "hello?");
   db.close();
-  const u = unread([{ name: "Ola Brandt", ring: "warm" }], file, NOW);
+  const u = unread([{ name: "Ola Brandt", ring: "warm" }, { name: "Mira Solis", ring: "close" }], file, NOW);
   if ("error" in u) throw new Error(u.error);
-  expect(u.chats.map((c) => [c.name, c.ring, c.count])).toEqual([["Ola Brandt", "warm", 1], ["Mira Solis", null, 3]]);
+  expect(u.chats.map((c) => [c.name, c.ring, c.count])).toEqual([["Ola Brandt", "warm", 1], ["Mira Solis", "close", 3]]);
   const mira = u.chats[1]!;
   expect(mira.messages.map((m) => m.text)).toEqual(["are you free sunday?", "📷 photo"]);
   expect(mira.reactions).toEqual(["❤️"]);

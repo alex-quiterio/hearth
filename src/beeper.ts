@@ -174,7 +174,8 @@ export function shifts(kin: { name: string; ring: string; aka?: string[] }[] = [
 }
 
 // ---- New messages: direct chats Beeper counts as unread ------------------------------------
-// The count is Beeper's own, so it matches the badge there; the lines are the newest unread ones.
+// Kin map people only. The count is Beeper's own, so it matches the badge there; the lines are
+// the newest unread ones.
 
 export type NewMessage = { at: number; type: string; text: string };
 export type Unread = {
@@ -224,12 +225,12 @@ export function unread(kin: { name: string; ring: string; aka?: string[] }[] = [
     const match = kinMatch(rooms.flatMap((r) => (r.name ? [r.name] : [])), kin);
     const chats = new Map<string, Unread>();
     for (const r of rooms) {
-      if (!r.name) continue;
+      const k = r.name ? match(r.name) : null;
+      if (!k) continue;
       const rows = (lines.all(r.room, r.readTo ?? 0, ...SPOKEN, "REACTION") as NewRow[]).reverse();
-      const k = match(r.name);
-      const id = k ? `kin:${k.name}` : key(r.name);
+      const id = `kin:${k.name}`;
       const net = r.account.split(".")[0]!;
-      const c = chats.get(id) ?? { name: k?.name ?? r.name, nets: [], ring: k?.ring ?? null, kin: k?.name ?? null, count: 0, last: 0, reactions: [], messages: [] };
+      const c = chats.get(id) ?? { name: k.name, nets: [], ring: k.ring, kin: k.name, count: 0, last: 0, reactions: [], messages: [] };
       if (!c.nets.includes(NETWORK[net] ?? net)) c.nets.push(NETWORK[net] ?? net);
       // A chat marked unread by hand has no count; it still shows, as one.
       c.count += Math.max(r.count ?? 0, 1);
@@ -241,8 +242,7 @@ export function unread(kin: { name: string; ring: string; aka?: string[] }[] = [
       chats.set(id, c);
     }
     for (const c of chats.values()) c.messages = c.messages.sort((a, b) => a.at - b.at).slice(-SHOWN);
-    // Kin map people first, then the newest.
-    return { at: now, chats: [...chats.values()].sort((a, b) => Number(!!b.ring) - Number(!!a.ring) || b.last - a.last) };
+    return { at: now, chats: [...chats.values()].sort((a, b) => b.last - a.last) };
   } catch (e) {
     return { error: `Beeper's index changed shape: ${(e as Error).message}` };
   } finally {

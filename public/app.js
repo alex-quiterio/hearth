@@ -561,7 +561,7 @@ function unreadSection() {
   };
   return `<details class="unread"${unreadOpen ? " open" : ""}><summary>To be read <span class="count">${total}</span>
       <span class="sub">${C.length ? `from ${C.length === 1 ? "1 person" : `${C.length} people`}` : "none, all read"}</span></summary>
-    ${C.length ? `<ul class="unread-list">${C.map(chat).join("")}</ul><p class="muted">Unread as Beeper counts it, direct chats only. Kin map people first; tap one to open them.</p>` : ""}</details>`;
+    ${C.length ? `<ul class="unread-list">${C.map(chat).join("")}</ul><p class="muted">Unread as Beeper counts it, direct chats with kin map people only; tap one to open them.</p>` : ""}</details>`;
 }
 
 function renderTalk() {
