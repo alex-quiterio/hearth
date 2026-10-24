@@ -151,7 +151,7 @@ function render() {
   // Inner work and practice live on the Inner screen; the kin screen keeps the rest, in config order.
   const byPanel = { focus: frostSection, "weak-points": weatherSection, rings: bedsSection };
   const rest = config.panels.filter((p) => byPanel[p]).map((p) => byPanel[p]());
-  $("#sections").innerHTML = [wateringSection(), askingSection(), birthdaysSection(), ...rest, journalSection()].join("");
+  $("#sections").innerHTML = [wateringSection(), askingSection(), draftsSection(), birthdaysSection(), ...rest, journalSection()].join("");
   $("#innerScreen").innerHTML = innerScreen();
   showScreen();
   window.scrollTo(0, y);
@@ -354,6 +354,24 @@ function birthdaysSection() {
         <span class="ops"><button class="tiny" data-run="/beeper:thread-reply ${esc(p.name)} — their birthday is ${esc(b.date)}${b.in ? ` (${birthdayWhen(b.in)})` : " (today)"}">Write</button></span>
         <div class="why muted">${esc(RING_NAME[p.ring])} · ${esc(sinceText(p))}</div></li>`;
     })
+    .join("")}</ul></section>`;
+}
+
+/** Threads whose last state is still unsent, from the conversation files: Finish picks the draft up where it was left. */
+function draftsSection() {
+  const drafts = S.drafts ?? [];
+  if (!drafts.length) return "";
+  const ago = (date) => {
+    const n = Math.round((Date.parse(G.today) - Date.parse(date)) / 86_400_000);
+    return n <= 0 ? "today" : n === 1 ? "yesterday" : `${n} days ago`;
+  };
+  const onMap = new Set(G.plants.map((p) => p.name));
+  return `<section class="panel"><h2>Drafts waiting <span class="sub">written, not yet sent</span></h2><ul class="frost">${drafts
+    .map((d) => `<li class="${Date.parse(G.today) - Date.parse(d.date) <= 2 * 86_400_000 ? "near" : ""}">
+        ${onMap.has(d.name) ? `<button class="linkish name" data-sheet="${esc(d.name)}">✎ ${esc(d.name)}</button>` : `<span class="name">✎ ${esc(d.name)}</span>`}
+        <span class="when">${esc(birthdayDay(d.date))} · ${ago(d.date)}</span>
+        <span class="ops"><button class="tiny" data-run="/beeper:thread-reply ${esc(d.name)} — finish the draft of ${esc(d.date)}${d.title ? `: ${esc(d.title)}` : ""}">Finish</button></span>
+        ${d.title ? `<div class="why muted">${esc(d.title)}</div>` : ""}</li>`)
     .join("")}</ul></section>`;
 }
 

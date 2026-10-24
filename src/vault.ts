@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { join, basename } from "node:path";
 import { readdir, stat } from "node:fs/promises";
-import { garden, threadSections, parseTending } from "./garden";
+import { garden, threadSections, openDrafts, parseTending } from "./garden";
 import { beeperOn, shifts } from "./beeper";
 
 // The vault is the single source of truth. Hearth only reads it; skills write it.
@@ -171,10 +171,12 @@ function parsePerson(line: string, ring: string): Person {
   };
 }
 
-/** Per person: date of the latest thread and how many threads end in an unsent draft. */
+export type Draft = { name: string; date: string; title: string };
+
+/** Per person: date of the latest thread, and the drafts still waiting to go out. */
 async function conversationSignals(vault: string) {
   const dir = join(vault, PATHS.conversations);
-  const out = new Map<string, { lastThread: string | null; draftsWaiting: number }>();
+  const out = new Map<string, { lastThread: string | null; draftsWaiting: number; drafts: Draft[] }>();
   let files: string[] = [];
   try {
     files = (await readdir(dir)).filter((f) => f.endsWith(".md"));
@@ -182,13 +184,24 @@ async function conversationSignals(vault: string) {
     return out;
   }
   for (const f of files) {
+    const name = f.replace(/\.md$/, "").normalize("NFC");
     const ts = threadSections(await Bun.file(join(dir, f)).text());
-    out.set(f.replace(/\.md$/, "").normalize("NFC"), {
-      lastThread: ts.map((t) => t.date).sort().at(-1) ?? null,
-      draftsWaiting: ts.filter((t) => t.state === "draft").length,
-    });
+    // "Beatriz (WhatsApp, 1:1), a morada do Ricardo" says only "a morada do Ricardo"; a bare "Name (WhatsApp, 1:1)" says nothing.
+    const drafts = openDrafts(ts).map((t) => ({ name, date: t.date, title: t.title.replace(/^[^(]*\([^)]*\)\s*,?\s*/, "") }));
+    out.set(name, { lastThread: ts.map((t) => t.date).sort().at(-1) ?? null, draftsWaiting: drafts.length, drafts });
   }
   return out;
+}
+
+const DRAFTS_WITHIN = 30; // days; older unsent drafts are left to the person's sheet
+
+/** Every draft still waiting to go out, newest first, from the last DRAFTS_WITHIN days. */
+export async function draftsState(vault: string, today = new Date().toLocaleDateString("sv-SE")): Promise<Draft[]> {
+  const since = new Date(Date.parse(today) - DRAFTS_WITHIN * 86_400_000).toISOString().slice(0, 10);
+  return [...(await conversationSignals(vault)).values()]
+    .flatMap((s) => s.drafts)
+    .filter((d) => d.date >= since)
+    .sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
 }
 
 export async function kinState(vault: string) {
@@ -215,7 +228,7 @@ export async function kinState(vault: string) {
         if (/^- /.test(l)) {
           const p = parsePerson(l.slice(2), ring.key);
           const sig = signals.get(p.name);
-          if (sig) Object.assign(p, sig);
+          if (sig) Object.assign(p, { lastThread: sig.lastThread, draftsWaiting: sig.draftsWaiting });
           people.push(p);
         } else if (people.length === 0) introLines.push(l);
         else extraLines.push(l);
@@ -445,7 +458,7 @@ export async function hearthConfig(vault: string) {
 }
 
 export async function state(vault: string, today?: string) {
-  const [config, kin, inner, tending, thinking, innerScreen, embers] = await Promise.all([
+  const [config, kin, inner, tending, thinking, innerScreen, embers, drafts] = await Promise.all([
     hearthConfig(vault),
     kinState(vault),
     innerState(vault),
@@ -453,13 +466,14 @@ export async function state(vault: string, today?: string) {
     thinkingState(vault),
     innerScreenState(vault),
     embersState(vault),
+    draftsState(vault, today),
   ]);
   // Who wrote last on Beeper, for the reply clock: timestamps only, kin map people only.
   const sh = beeperOn() ? shifts(kinPeople(kin).map((p) => ({ name: p.name, ring: p.ring, aka: p.aka }))) : null;
   const chats = sh && !("error" in sh) ? sh.all.filter((c) => c.kin) : [];
   const gardenState = await garden(vault, kinPeople(kin), config, today, chats);
   const woes = kinPeople(kin).filter((p) => p.woe != null).map((p) => ({ name: p.name, rhythm: p.woe, place: p.place }));
-  return { vaultName: VAULT_NAME, config, kin, inner, tending, thinking: { ...thinking, woes }, innerScreen, embers, garden: gardenState, at: Date.now() };
+  return { vaultName: VAULT_NAME, config, kin, inner, tending, thinking: { ...thinking, woes }, innerScreen, embers, drafts, garden: gardenState, at: Date.now() };
 }
 
 export const kinPeople = (kin: Awaited<ReturnType<typeof kinState>>): Person[] =>

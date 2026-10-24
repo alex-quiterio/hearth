@@ -63,6 +63,14 @@ each with a Write button that hands the date to `/beeper:thread-reply`; a birthd
 puts a small candle on their plant, and their sheet shows the next one. 29 Feb falls on 28 Feb in
 other years.
 
+## Drafts waiting
+
+A thread in `4 - Archive/conversations/` whose last state is still unsent shows under **Drafts waiting**
+on the Kin screen, newest first, from the last 30 days. A state is an `Estado: **…**` line or a bold send
+log line (`**Enviado.** Linha 1, 11h28`); one that still names lines to go ("faltam", "still to go") counts
+as half sent, and "abandoned" or "sem efeito" closes the thread. A draft overtaken by a later sent thread to
+the same person drops away. **Finish** hands it to `/beeper:thread-reply` with its date and title.
+
 ## Talk
 
 📊 Talk (`#talk`) counts direct messages from Beeper Desktop's local index, read only and never

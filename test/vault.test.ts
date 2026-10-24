@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { state, md, servers, birthdayOf } from "../src/vault";
+import { state, md, servers, birthdayOf, draftsState } from "../src/vault";
 
 const VAULT = join(import.meta.dir, "fixtures/vault");
 const s = await state(VAULT);
@@ -52,11 +52,27 @@ describe("conversation signals", () => {
   });
 
   test("accented names match files stored in decomposed Unicode", () => {
-    expect(person("Inês Feijão")).toMatchObject({ lastThread: "2026-09-25", draftsWaiting: 1 });
+    // Nothing sent yet, so both threads wait, the half sent one included.
+    expect(person("Inês Feijão")).toMatchObject({ lastThread: "2026-09-25", draftsWaiting: 2 });
   });
 
   test("no conversation file means no signals", () => {
     expect(person("Lena")).toMatchObject({ lastThread: null, draftsWaiting: 0 });
+  });
+});
+
+describe("drafts waiting", () => {
+  test("open drafts from the last month, newest first, titled", async () => {
+    const drafts = await draftsState(VAULT, "2026-10-09");
+    expect(drafts.map((d) => [d.name, d.date])).toEqual([
+      ["Ana Exemplo", "2026-09-29"],
+      ["Inês Feijão", "2026-09-25"],
+      ["Inês Feijão", "2026-09-15"],
+    ]);
+  });
+
+  test("drafts older than a month leave the list", async () => {
+    expect((await draftsState(VAULT, "2026-10-26")).map((d) => d.date)).toEqual(["2026-09-29"]);
   });
 });
 

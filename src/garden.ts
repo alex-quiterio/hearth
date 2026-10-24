@@ -93,23 +93,42 @@ function tendedOn(e: Entry, b: Block): string | null {
 
 // ---- Other sources of "last tended" ---------------------------------------------------
 
-const STATE = /^(?:Estado|Status|State)[^:\n]*: \*\*([^*]+)\*\*/gm;
-const NOT_SENT = /not sent|não enviad|por enviar|rascunho|draft|unsent/i;
+// A state is an "Estado: **…**" line, or a send log line that opens in bold ("**Enviado.** Linha 1, 11h28").
+const STATE = /^(?:(?:Estado|Status|State)[^:\n]*: \*\*([^*]+)\*\*|\*\*((?:Enviad|Sent|Não enviad|Not sent)[^*]*)\*\*)(.*)$/gim;
+const NOT_SENT = /not sent|não enviad|por enviar|por escrever|rascunho|draft|unsent|partial|parcial/i;
+// A send log line that still names lines to go is a thread half sent.
+const STILL_TO_GO = /\bfalta|still to go|lines? \d.* to go|remain/i;
 
-/** The last recorded state of one thread section: "sent", "draft", or null if none. */
-export function threadState(section: string): "sent" | "draft" | null {
-  const last = [...section.matchAll(STATE)].at(-1)?.[1];
-  if (!last) return null;
-  return NOT_SENT.test(last) ? "draft" : /sent|enviad|todas|tudo/i.test(last) ? "sent" : "draft";
+const CLOSED = /abandon|sem efeito|dropped|superseded|substitu/i;
+
+/** The last recorded state of one thread section: "sent", "draft", "closed" (let go unsent), or null if none. */
+export function threadState(section: string): "sent" | "draft" | "closed" | null {
+  const m = [...section.matchAll(STATE)].at(-1);
+  if (!m) return null;
+  const last = m[1] ?? m[2]!;
+  if (CLOSED.test(last)) return "closed";
+  if (NOT_SENT.test(last)) return "draft";
+  if (m[2] && STILL_TO_GO.test(m[3]!)) return "draft";
+  return /sent|enviad|todas|tudo/i.test(last) ? "sent" : "draft";
 }
 
-/** A person file split into its dated thread sections. */
+/** A person file split into its dated thread sections, each titled by its last `#### ` heading. */
 export function threadSections(text: string) {
   return text
     .split(/^## /m)
     .slice(1)
-    .map((part) => ({ date: part.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? null, state: threadState(part) }))
-    .filter((t): t is { date: string; state: "sent" | "draft" | null } => !!t.date);
+    .map((part) => ({
+      date: part.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? null,
+      state: threadState(part),
+      title: [...part.matchAll(/^#### (.+)$/gm)].at(-1)?.[1]?.trim() ?? "",
+    }))
+    .filter((t): t is { date: string; state: ReturnType<typeof threadState>; title: string } => !!t.date);
+}
+
+/** Threads still waiting to go out: drafts dated on or after the person's last sent thread, so a draft overtaken by a later send drops away. */
+export function openDrafts(ts: ReturnType<typeof threadSections>) {
+  const lastSent = ts.filter((t) => t.state === "sent").map((t) => t.date).sort().at(-1) ?? "";
+  return ts.filter((t) => t.state === "draft" && t.date >= lastSent);
 }
 
 /** Per person file: every thread date, the dates of the threads actually sent, and the latest of those. */

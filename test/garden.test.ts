@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { cp, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { state, kinState, kinPeople } from "../src/vault";
-import { garden, isoWeek, mapDate, nextBirthday, thirstOf, threadState, waterPlant } from "../src/garden";
+import { garden, isoWeek, mapDate, nextBirthday, openDrafts, thirstOf, threadSections, threadState, waterPlant } from "../src/garden";
 
 const FIXTURE = join(import.meta.dir, "fixtures/vault");
 const TODAY = "2026-10-09";
@@ -31,6 +31,20 @@ describe("pieces", () => {
     expect(threadState("Estado: **all chunks sent**, às 00:16")).toBe("sent");
     expect(threadState("Estado: **rascunho, não enviado**")).toBe("draft");
     expect(threadState("no state here")).toBeNull();
+  });
+
+  test("a bold send log line counts as a state, and one with lines still to go is half sent", () => {
+    expect(threadState("Estado: **not sent**\n\n**Enviado** (2026-10-24, 11h20), threaded à 84108.")).toBe("sent");
+    expect(threadState("Estado: **not sent**\n\n**Enviado.** Linha 1, 11h28. Faltam as linhas 2 a 4.")).toBe("draft");
+    expect(threadState("**Sent.** Line 1, 11:30. Lines 2 to 4 still to go.")).toBe("draft");
+    expect(threadState("Estado: **parcialmente enviado**, linha 5 por enviar.")).toBe("draft");
+    expect(threadState("Estado: **enviado**\n\nEstado: **por escrever à mão**")).toBe("draft");
+    expect(threadState("Estado: **abandoned**. Thursday passed.")).toBe("closed");
+  });
+
+  test("a draft overtaken by a later send is no longer open", () => {
+    const ts = threadSections("## 2026-10-01\nEstado: **not sent**\n## 2026-10-05\n#### Lucy, o pão\nEstado: **enviado**\n## 2026-10-09\n#### Lucy, a carta\nEstado: **not sent**");
+    expect(openDrafts(ts).map((t) => [t.date, t.title])).toEqual([["2026-10-09", "Lucy, a carta"]]);
   });
 
   test("the next birthday is today or later, wrapping the year, and 29 Feb falls on 28 Feb", () => {
