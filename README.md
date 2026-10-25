@@ -63,6 +63,16 @@ each with a Write button that hands the date to `/beeper:thread-reply`; a birthd
 puts a small candle on their plant, and their sheet shows the next one. 29 Feb falls on 28 Feb in
 other years.
 
+## Forecast
+
+Both screens show a **Forecast** of the next 14 days, built from dates Hearth already reads: birthdays from the
+kin map 🎂, `watch` end dates ⚑ and `now` dates ✦ from Hearth.md, emergent listen dates 👂, and the new and full
+moon. Each day gets weather for how much it holds: ☀️ clear, 🌤️ one thing, ⛅ two, 🌧️ three or more. Tap a
+day to see what's on it, with Write for a birthday and Begin for anything that has a skill. A watch that ends on
+that person's birthday counts once, as the birthday. Dates from the last week that passed but are still in
+Hearth.md show under **Carried over**. **Read the weeks ahead** sends the whole list to Claude to plan around.
+The moon is the mean moon, so it can land a day off the almanac.
+
 ## Drafts waiting
 
 A thread in `4 - Archive/conversations/` whose last state is still unsent shows under **Drafts waiting**

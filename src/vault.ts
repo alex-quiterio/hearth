@@ -3,6 +3,7 @@ import { join, basename } from "node:path";
 import { readdir, stat } from "node:fs/promises";
 import { garden, threadSections, openDrafts, parseTending } from "./garden";
 import { beeperOn, shifts } from "./beeper";
+import { forecast } from "./forecast";
 
 // The vault is the single source of truth. Hearth only reads it; skills write it.
 
@@ -473,7 +474,8 @@ export async function state(vault: string, today?: string) {
   const chats = sh && !("error" in sh) ? sh.all.filter((c) => c.kin) : [];
   const gardenState = await garden(vault, kinPeople(kin), config, today, chats);
   const woes = kinPeople(kin).filter((p) => p.woe != null).map((p) => ({ name: p.name, rhythm: p.woe, place: p.place }));
-  return { vaultName: VAULT_NAME, config, kin, inner, tending, thinking: { ...thinking, woes }, innerScreen, embers, drafts, garden: gardenState, at: Date.now() };
+  const ahead = forecast({ people: gardenState.plants, watch: config.watch, now: config.now, experiments: thinking.experiments }, gardenState.today);
+  return { vaultName: VAULT_NAME, config, kin, inner, tending, thinking: { ...thinking, woes }, innerScreen, embers, drafts, garden: gardenState, forecast: ahead, at: Date.now() };
 }
 
 export const kinPeople = (kin: Awaited<ReturnType<typeof kinState>>): Person[] =>

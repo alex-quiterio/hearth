@@ -151,7 +151,7 @@ function render() {
   // Inner work and practice live on the Inner screen; the kin screen keeps the rest, in config order.
   const byPanel = { focus: frostSection, "weak-points": weatherSection, rings: bedsSection };
   const rest = config.panels.filter((p) => byPanel[p]).map((p) => byPanel[p]());
-  $("#sections").innerHTML = [wateringSection(), askingSection(), draftsSection(), birthdaysSection(), ...rest, journalSection()].join("");
+  $("#sections").innerHTML = [wateringSection(), forecastSection(), askingSection(), draftsSection(), birthdaysSection(), ...rest, journalSection()].join("");
   $("#innerScreen").innerHTML = innerScreen();
   showScreen();
   window.scrollTo(0, y);
@@ -374,6 +374,66 @@ function draftsSection() {
         ${d.title ? `<div class="why muted">${esc(d.title)}</div>` : ""}</li>`)
     .join("")}</ul></section>`;
 }
+
+/* ---------- the forecast: the dated things ahead, day by day ---------- */
+
+const WEATHER = { clear: ["☀️", "clear"], fair: ["🌤️", "one thing"], cloudy: ["⛅", "two things"], stormy: ["🌧️", "a full day"] };
+const EVENT_GLYPH = { birthday: "🎂", watch: "⚑", now: "✦", listen: "👂" };
+const MOON_GLYPH = { "new moon": "🌑", "full moon": "🌕" };
+let forecastPick = null; // the day opened in the forecast; null for the first day with something on it
+
+function forecastPrompt(f) {
+  const line = (date, e) => `- ${date} · ${e.what}${e.why ? ` (${e.why})` : ""}`;
+  const ahead = f.days.flatMap((d) => [...d.events.map((e) => line(d.date, e)), ...(d.moon ? [`- ${d.date} · ${d.moon}`] : [])]);
+  const carried = f.carried.map((e) => line(e.date, e));
+  return `Here is my Hearth forecast for ${f.today} to ${f.last}, from the kin map and Hearth.md:\n${ahead.join("\n") || "- nothing dated"}${
+    carried.length ? `\n\nPassed but still in Hearth.md:\n${carried.join("\n")}` : ""
+  }\n\nRead the next two weeks with me: which days need care, what should I prepare now so it isn't a rush, and which passed dates to close or move. Short, then ask me one question. Don't write anything to the vault unless I ask.`;
+}
+
+function forecastEvent(e, date) {
+  const plant = e.name && plantOf(e.name);
+  const who = plant ? `<button class="linkish name" data-sheet="${esc(e.name)}">${EVENT_GLYPH[e.kind]} ${esc(e.what)}</button>` : `<span class="name">${EVENT_GLYPH[e.kind]} ${esc(e.what)}</span>`;
+  const op = e.kind === "birthday"
+    ? `<button class="tiny" data-run="/beeper:thread-reply ${esc(e.name)} — their birthday is ${esc(date)}">Write</button>`
+    : e.run ? `<button class="tiny" data-run="${esc(e.run)}">Begin</button>` : "";
+  return `<li class="fc-${e.kind}">${who}${op ? `<span class="ops">${op}</span>` : ""}${e.why ? `<div class="why muted">${esc(e.why)}</div>` : ""}</li>`;
+}
+
+function forecastSection() {
+  const f = S.forecast;
+  if (!f) return "";
+  const busy = f.days.filter((d) => d.events.length);
+  const pick = f.days.find((d) => d.date === forecastPick) ?? busy[0] ?? f.days[0];
+  const cells = f.days.map((d, i) => {
+    const [glyph, gloss] = WEATHER[d.weather];
+    const label = `${birthdayDay(d.date)}: ${gloss}${d.moon ? `, ${d.moon}` : ""}`;
+    return `<button class="fc-day ${d === pick ? "on" : ""} fc-${d.weather}" data-forecast="${esc(d.date)}" aria-pressed="${d === pick}" title="${esc(label)}" aria-label="${esc(label)}">
+      <span class="fc-wd">${i === 0 ? "today" : new Date(d.date + "T12:00").toLocaleDateString("en-GB", { weekday: "short" })}</span>
+      <span class="fc-n">${Number(d.date.slice(8))}</span>
+      <span class="fc-sky" aria-hidden="true">${glyph}</span>
+      <span class="fc-marks" aria-hidden="true">${d.events.map((e) => EVENT_GLYPH[e.kind]).join("")}${d.moon ? MOON_GLYPH[d.moon] : ""}</span>
+    </button>`;
+  }).join("");
+  const when = pick.date === f.today ? "today" : birthdayDay(pick.date);
+  const list = pick.events.length || pick.moon
+    ? `<ul class="frost">${pick.events.map((e) => forecastEvent(e, pick.date)).join("")}${pick.moon ? `<li><span class="name">${MOON_GLYPH[pick.moon]} ${esc(pick.moon)}</span></li>` : ""}</ul>`
+    : `<p class="muted">Nothing dated on ${esc(when)}: clear skies.</p>`;
+  const carried = f.carried.length
+    ? `<div class="label">Carried over <span class="muted">passed, still in Hearth.md</span></div><ul class="frost">${f.carried
+        .map((e) => forecastEvent({ ...e, why: `${birthdayDay(e.date)}${e.why ? ` · ${e.why}` : ""}` }, e.date)).join("")}</ul>`
+    : "";
+  return `<section class="panel forecast"><h2>Forecast <span class="sub">${busy.length ? `${busy.length} of the next ${f.days.length} days hold something` : `the next ${f.days.length} days are clear`}</span>
+      <button class="tiny ghost" data-run="${esc(forecastPrompt(f))}" title="Ask your AI buddy to read the two weeks ahead with you">Read the weeks ahead</button></h2>
+    <div class="fc-strip" role="group" aria-label="The next ${f.days.length} days">${cells}</div>
+    <div class="label">${esc(when)}</div>${list}${carried}</section>`;
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-forecast]");
+  if (!b) return;
+  forecastPick = b.dataset.forecast;
+  for (const el of document.querySelectorAll(".forecast")) el.outerHTML = forecastSection();
+});
 
 function frostSection() {
   const { pinned, watch } = S.config;
@@ -933,6 +993,7 @@ function innerScreen() {
   return [
     skySection(),
     nowSection(),
+    forecastSection(),
     emberSection(),
     innerLaunch(),
     soilSection(),

@@ -194,6 +194,21 @@ button.name { cursor: pointer; } button.name:hover { color: var(--clay-ink); }
 .anchors li { border-left-color: #9d968a; }
 
 .weather { background: linear-gradient(180deg, color-mix(in srgb, var(--water) 6%, var(--surface)), var(--surface)); }
+.forecast { background: linear-gradient(180deg, color-mix(in srgb, var(--amber) 7%, var(--surface)), var(--surface)); }
+.forecast h2 .tiny { margin-left: 6px; }
+.fc-strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(52px, 1fr); gap: 6px; overflow-x: auto; padding: 2px 2px 8px; margin-bottom: 8px; scroll-snap-type: x proximity; }
+.fc-day { display: grid; justify-items: center; gap: 2px; padding: 6px 2px; border-radius: 12px; background: var(--surface-2); border: 1.5px solid transparent; scroll-snap-align: start; font: 500 12px Inter, sans-serif; color: var(--ink); }
+.fc-day:hover { border-color: var(--line); }
+.fc-day.on { border-color: var(--clay); background: color-mix(in srgb, var(--clay) 10%, var(--surface-2)); }
+.fc-day.fc-clear { opacity: .7; } .fc-day.fc-clear.on { opacity: 1; }
+.fc-wd { color: var(--muted); font-size: 11px; text-transform: lowercase; }
+.fc-n { font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 17px; }
+.fc-sky { font-size: 18px; line-height: 1.2; }
+.fc-marks { min-height: 15px; font-size: 11px; letter-spacing: 1px; color: var(--clay-ink); }
+.forecast .frost li.fc-birthday { border-left-color: var(--amber); }
+.forecast .frost li.fc-watch { border-left-color: var(--clay); }
+.forecast .frost li.fc-now, .forecast .frost li.fc-listen { border-left-color: var(--moss); }
+.forecast .label + .frost { margin-bottom: 10px; }
 .minis { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .mini { padding: 14px 16px; } .mini h3 { margin-top: 0; }
 
