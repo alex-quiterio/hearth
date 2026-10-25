@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#c4572e">
   <title>Hearth</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -34,8 +34,8 @@
         <form id="logoutForm" method="post" action="/logout" hidden></form>
         <div class="powers">
           <button class="power" id="autoLock" aria-pressed="false" hidden></button>
-          <button class="power" id="logout" title="Lock Hearth on this browser: the password opens it again" hidden>🔒 Lock</button>
-          <button class="power" id="shutdown" hidden title="Stop the Hearth server" aria-label="Stop the Hearth server">⏻ Stop server</button>
+          <button class="power" id="logout" aria-label="Lock Hearth" title="Lock Hearth on this browser: the password opens it again" hidden><span aria-hidden="true">🔒</span><span class="power-text"> Lock</span></button>
+          <button class="power" id="shutdown" hidden title="Stop the Hearth server" aria-label="Stop the Hearth server"><span aria-hidden="true">⏻</span><span class="power-text"> Stop server</span></button>
         </div>
       </header>
       <div id="notices"></div>
@@ -98,7 +98,13 @@
     <input type="search" id="menuSearch" placeholder="Find a command… (try spell, money, reply)" aria-label="Find a command" autocomplete="off">
     <div id="menuBody"></div>
   </dialog>
-  <button class="chat-fab only-mobile" id="openChat" title="Conversation" aria-label="Conversation">💬</button>
+  <nav class="tabbar only-mobile" aria-label="Screens">
+    <a href="#inner" data-screen="inner"><span aria-hidden="true">🕯️</span>Inner</a>
+    <a href="#kin" data-screen="kin"><span aria-hidden="true">🫂</span>Kin</a>
+    <a href="#talk" data-screen="talk" hidden><span aria-hidden="true">📊</span>Talk</a>
+    <button type="button" data-open-menu aria-haspopup="dialog"><span aria-hidden="true">☰</span>Menu</button>
+    <button class="chat-fab" id="openChat" title="Conversation" aria-label="Conversation">💬</button>
+  </nav>
   <button class="build" id="serversOpen" title="Which Hearth server this is, and the others to connect to. Version: the commit checked out, + when there are uncommitted changes" aria-haspopup="dialog"><span>hearth</span> v<!--SHA--> <b id="serverHere"></b></button>
   <dialog class="sheet" id="servers" aria-label="Servers">
     <form method="dialog" class="sheet-close"><button class="ghost" aria-label="Close">✕</button></form>

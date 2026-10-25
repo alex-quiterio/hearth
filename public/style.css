@@ -380,9 +380,8 @@ body.claude-working #send { background: transparent; color: var(--moss); }
 .queued-meta .linkish { font-size: 12px; }
 
 .top { position: relative; }
-.powers { position: absolute; top: 4px; right: 0; display: flex; gap: 6px; }
-/* On a phone the three buttons would sit on the title: give them their own row above it. */
-@media (max-width: 600px) { .powers { position: static; order: -1; width: 100%; flex-wrap: wrap; justify-content: flex-end; } }
+/* Their own row above the title, so a narrow pane beside the conversation never lays them over it. */
+.powers { order: -1; width: 100%; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .power { font-size: 12.5px; padding: 5px 11px; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; }
 .power:hover { color: var(--clay-ink); border-color: var(--clay); }
 .stopped { max-width: 520px; margin: 10vh auto; padding: 0 16px; text-align: center; }
@@ -630,3 +629,114 @@ button.build:hover { border-color: var(--muted); }
 .spark rect.peak { fill: var(--moss); }
 .spark rect.now { fill: var(--clay); }
 .rhythm-box p { margin: 6px 0 0; }
+
+/* ---------- on a phone ----------
+   A bottom tab bar within thumb reach (screens, menu, conversation), sheets that rise from the
+   bottom, 16px inputs so iOS doesn't zoom, bigger tap targets, and room for the notch and home bar. */
+:root { --tabbar-h: 62px; --safe-b: env(safe-area-inset-bottom, 0px); }
+button, a, .plant { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.chat-log, .sheet, .history { overscroll-behavior: contain; }
+
+@media (max-width: 900px) {
+  .tabbar.only-mobile {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 25;
+    height: calc(var(--tabbar-h) + var(--safe-b)); padding: 6px 8px calc(6px + var(--safe-b));
+    background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid var(--line); align-items: stretch; justify-content: space-around;
+  }
+  .tabbar > a, .tabbar > button {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    min-width: 0; border: 0; border-radius: 14px; background: none; padding: 2px 0; color: var(--muted);
+    font: 500 11px/1.2 Inter, system-ui, sans-serif; text-decoration: none;
+  }
+  .tabbar > a[hidden] { display: none; }
+  .tabbar span { font-size: 21px; line-height: 1.15; filter: grayscale(.6); opacity: .8; }
+  .tabbar > a[aria-current="page"] { color: var(--ink); background: var(--surface-2); }
+  .tabbar > a[aria-current="page"] span { filter: none; opacity: 1; }
+  /* The conversation button sits in the bar, still clay, still glowing while the AI buddy works. */
+  .tabbar .chat-fab { position: static; flex: none; width: 52px; height: 48px; align-self: center; margin-left: 4px; border-radius: 16px; font-size: 22px; color: #fff; background: var(--clay); box-shadow: none; }
+  /* The bar does what the top tabs and the menu button did. */
+  .brand .screens, #menuOpen { display: none; }
+  .tools:not(:has(button:not(#menuOpen))) { display: none; }
+  main { padding-bottom: calc(var(--tabbar-h) + var(--safe-b) + 24px); }
+  /* The version pill goes to the foot of the page instead of floating over it. */
+  .build { position: static; margin: 0 16px calc(var(--tabbar-h) + var(--safe-b) + 16px); }
+  .chat { height: 88dvh; padding-bottom: var(--safe-b); z-index: 40; }
+  .toast { bottom: calc(var(--tabbar-h) + var(--safe-b) + 12px); }
+}
+
+@media (max-width: 640px) {
+  /* The conversation takes the whole phone, like a messaging app, instead of a sheet that cuts the title in half. */
+  .chat { inset: 0; height: 100dvh; border-radius: 0; border-top: 0; padding-top: env(safe-area-inset-top, 0px); }
+}
+ (max-width: 640px) {
+  main { padding-top: calc(14px + env(safe-area-inset-top, 0px)); padding-inline: 12px; }
+  .top { gap: 10px; margin-bottom: 4px; }
+  h1 { font-size: 26px; }
+  .today { font-size: 15px; margin: 0 0 4px; }
+  /* Lock, auto-lock and stop shrink to round icons beside the title, so they never sit on it. */
+  .powers { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 2px); right: 0; width: auto; gap: 8px; }
+  .power { width: 38px; height: 38px; padding: 0; display: inline-grid; place-items: center; font-size: 17px; line-height: 1; }
+  .power .power-text { display: none; }
+  .power[aria-pressed="true"] { border-color: var(--clay); background: color-mix(in srgb, var(--clay) 14%, transparent); position: relative; }
+  .power[aria-pressed="true"]::after { content: ""; position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background: var(--clay); }
+  .brand { padding-right: 140px; }
+  .brand .today, .brand .rhythm { margin-right: -140px; }
+  .panel { padding: 14px; border-radius: 16px; }
+  .panel h2 { font-size: 20px; }
+  .panel h2 .sub { display: block; margin: 2px 0 0; }
+
+  /* Sheets rise from the bottom, full width, scroll inside, and leave the home bar clear. */
+  dialog.sheet {
+    margin: auto 0 0; width: 100%; max-width: 100%; max-height: 88dvh; overflow-y: auto;
+    border-radius: 22px 22px 0 0; border-bottom: 0; padding: 22px 18px calc(20px + var(--safe-b));
+    animation: rise .22s ease-out;
+  }
+  dialog.sheet::before { content: ""; display: block; width: 40px; height: 4px; border-radius: 2px; background: var(--line); margin: -10px auto 12px; }
+  .sheet-ops { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .sheet-ops > * { text-align: center; margin: 0 !important; }
+  .sheet-ops > a:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .panel h2 .tiny, .panel h2 button { font: 500 13px/1.3 Inter, system-ui, sans-serif; vertical-align: middle; }
+
+  /* Room for a thumb. */
+  .tiny, .water.tiny, .chip { min-height: 36px; padding: 6px 14px; font-size: 13.5px; }
+  .ops .tiny + .tiny, .ops .water + .tiny { margin-left: 4px; }
+  .fc-strip { grid-auto-columns: 56px; margin-inline: -4px; }
+  .around { grid-template-columns: 1fr; }
+}
+@keyframes rise { from { transform: translateY(40px); opacity: .4; } to { transform: none; opacity: 1; } }
+
+/* iOS zooms into any field under 16px; never on a touch screen. */
+@media (pointer: coarse) {
+  input, select, textarea, .chat-input textarea, .proposal textarea { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { dialog.sheet { animation: none; } }
+@media (max-width: 640px) { .talk details:has(> .talk-table) { overflow-x: auto; } }
+
+/* Today: the few people to reach today */
+.today-panel { background: linear-gradient(180deg, color-mix(in srgb, var(--moss) 8%, var(--surface)), var(--surface)); }
+.today-done { margin-left: 8px; font: 500 12.5px Inter, system-ui, sans-serif; color: var(--moss); }
+.today-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.today-list li { position: relative; overflow: hidden; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); border-left: 3px solid var(--moss); }
+.today-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.today-head .name { font-weight: 600; }
+.today-head .ring-tag { font-size: 11px; text-transform: lowercase; color: var(--ink-2); background: var(--surface); border-radius: 999px; padding: 0 7px; }
+.today-when { font-size: 12px; margin-left: auto; }
+.around-badge { margin-left: auto; background: var(--moss); color: #fff; }
+.today-list .why { margin-top: 2px; }
+.today-also { font-size: 12.5px; margin-top: 2px; }
+.today-list .ops { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.today-list .ops [data-not-today] { margin-left: auto; }
+.today-more { margin-top: 10px; }
+.today-more > summary { cursor: pointer; color: var(--muted); font-size: 13.5px; padding: 4px 0; }
+.today-more .today-list { margin-top: 8px; }
+.today-more .today-list li { border-left-color: var(--line); }
+/* The Inner screen's practice week glows amber, the Kin screen's contact week moss. */
+body[data-screen="inner"] .rhythm .dots i { border-color: var(--amber); }
+body[data-screen="inner"] .rhythm .dots i.on { background: var(--amber); }
+#autoAllow .label { text-transform: none; letter-spacing: 0; font-size: inherit; font-weight: 500; }
+/* A narrow conversation sidebar: the buttons shrink and wrap before anything is cut off. */
+.chat-buttons { flex-wrap: wrap; min-width: 0; }
+.chat-buttons > * { flex: none; }
+.chat-buttons #model { flex: 0 1 auto; }
+@container (max-width: 320px) { #model { max-width: 7.5em; } .chat-buttons { gap: 6px; } }

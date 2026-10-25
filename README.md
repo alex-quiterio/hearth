@@ -35,6 +35,7 @@ pandora vault ──read──▶ hearth (Bun server) ──▶ browser dashboar
   draws the next. It gathers inner work and thinking: a Begin grid of every inner-work and thinking skill, Own psychology and
   Own territory (veiled), the latest Proprioception moments, the Practice panel, the
   Coordination partner note, and what the thinking skills lately left in Rough Notes.
+- **Each screen keeps to its own world.** The line under the date is practice days on Inner, days in touch on Kin, and Beeper on Talk; each screen's Forecast holds only its own dates; the menu opens with that screen's skills first; and an empty conversation suggests what to bring from there.
 - **One menu for every command.** ☰ Menu (or ⌘K) lists every buchecha skill, read from the
   plugin checkout (`HEARTH_PLUGINS_DIR`) and grouped by plugin, with the hearth's own
   `actions` first and a search box. Only "Tend the hearth" stays in the header.
@@ -62,6 +63,10 @@ Março" gives that person a birthday. The Kin screen lists **Birthdays ahead** f
 each with a Write button that hands the date to `/beeper:thread-reply`; a birthday within two weeks
 puts a small candle on their plant, and their sheet shows the next one. 29 Feb falls on 28 Feb in
 other years.
+
+## Today
+
+The Kin screen opens on **Today**: the five people most worth reaching today, from every signal at once. Waiting on your reply (longest past their window first), a birthday within two days, this week's tending, a draft from the last week, a watch ending within two days, and core or close people gone thirsty. Pinned people and anyone **around now** (from Rhythms) move up. Each row leads with its strongest reason and the matching button (Reply, Write or Finish, handed to `/beeper:thread-reply` with their best hours), plus Tended and **Not today**, which hides them until tomorrow in this browser. Someone tended today drops off, and the heading counts them.
 
 ## Forecast
 
@@ -144,7 +149,7 @@ Android needs before it offers to install:
 3. On the phone, with Tailscale on: open that address in Chrome, log in, then ⋮ → **Add to Home
    screen** (or **Install app**).
 
-It opens full screen with the flame icon; a long press on the icon jumps to Inner or Kin. The
+It opens full screen with the flame icon; a long press on the icon jumps to Inner or Kin. On a phone the screens, the menu and the conversation sit in a tab bar at the bottom, within thumb reach; a person's sheet and the menu rise from the bottom; Enter in the chat is a new line and Send sends; fields are 16px so iOS never zooms; and the page keeps clear of the notch and the home bar. The
 service worker keeps no vault content on the phone, only the list of Hearth servers.
 
 **More than one Mac.** List every Hearth server under `servers:` in `Hearth.md`, in order of

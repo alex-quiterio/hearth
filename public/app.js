@@ -128,11 +128,6 @@ function render() {
   const d = new Date(G.today + "T12:00");
   $("#today").textContent = d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
 
-  const active = G.rhythm.filter((r) => r.active).length;
-  $("#rhythm").innerHTML = G.rhythm.length
-    ? `<span class="dots">${G.rhythm.map((r) => `<i class="${r.active ? "on" : ""}" title="${esc(r.date)}${r.active ? " · in touch" : ""}"></i>`).join("")}</span>
-       <span class="muted">${active ? `in touch on ${active} of the last 7 days` : "a quiet week so far"}</span>`
-    : "";
 
   $("#actions").innerHTML = config.actions
     .map((a, i) => (/hearth/i.test(a.prompt) ? `<button class="tool gardener" data-action="${i}" title="${esc(a.hint ?? a.prompt)}">${esc(a.label)}</button>` : ""))
@@ -151,9 +146,10 @@ function render() {
   // Inner work and practice live on the Inner screen; the kin screen keeps the rest, in config order.
   const byPanel = { focus: frostSection, "weak-points": weatherSection, rings: bedsSection };
   const rest = config.panels.filter((p) => byPanel[p]).map((p) => byPanel[p]());
-  $("#sections").innerHTML = [wateringSection(), forecastSection(), askingSection(), draftsSection(), birthdaysSection(), ...rest, journalSection()].join("");
+  $("#sections").innerHTML = [todaySection(), wateringSection(), forecastSection("kin"), draftsSection(), birthdaysSection(), ...rest, journalSection()].join("");
   $("#innerScreen").innerHTML = innerScreen();
   showScreen();
+  loadRhythms(); // once: Today and the sheets read who is around from it
   window.scrollTo(0, y);
 }
 
@@ -322,19 +318,81 @@ function wgroup(title, list, card, empty = "") {
     <div class="wgrid">${list.map(card).join("")}</div>`;
 }
 
-function askingSection() {
-  const asking = G.plants
-    .filter((p) => ["thirsty", "wilting"].includes(p.thirst) && ["core", "close", "new"].includes(p.ring) && !p.thisWeek)
-    .sort((a, b) => (b.daysSince ?? 0) - (a.daysSince ?? 0))
-    .slice(0, 5);
-  if (!asking.length) return "";
-  return `<section class="panel"><h2>Gone quiet</h2><div class="asks">${asking
-    .map((p) => `<div class="ask" data-wcard="${esc(p.name)}"><button class="linkish name" data-sheet="${esc(p.name)}">${esc(p.name)}</button>
-      <span class="muted">${esc(sinceText(p))}</span>
-      <span class="ops"><button class="water tiny" data-water="${esc(p.name)}">Tended</button><button class="tiny" data-run="/kin:tend focus on ${esc(p.name)}">Tend</button></span>
-      <span class="wave" aria-hidden="true"></span></div>`)
-    .join("")}</div></section>`;
+/* ---------- today: the few people to reach today, from every signal at once ---------- */
+
+// Each signal scores a person; the strongest reason leads and picks the action, the rest ride along.
+// "Not today" hides someone until tomorrow, per browser.
+const TODAY_SHOWN = 5;
+let todayMoreOpen = false; // the rest of the queue stays open across re-renders once opened
+const notToday = () => { try { return JSON.parse(store.get(`hearth.notToday.${G.today}`) ?? "[]"); } catch { return []; } };
+function todayQueue() {
+  const now = Date.now(), hidden = new Set(notToday());
+  const recent = new Map((S.drafts ?? []).filter((d) => daysUntil(d.date) >= -7).map((d) => [d.name, d]));
+  const out = [];
+  for (const p of G.plants) {
+    if (hidden.has(p.name) || (p.lastTended === G.today && !p.waitingSince)) continue;
+    const why = [];
+    const add = (score, text, act) => why.push({ score, text, act });
+    if (p.waitingSince) {
+      const over = (now - p.waitingSince) / DAY_MS / p.replyWithin;
+      add(80 + Math.min(40, over * 20), `wrote ${agoMs(p.waitingSince)}, waiting on you`, "reply");
+    }
+    const b = p.nextBirthday;
+    if (b && b.in <= 2) add(b.in === 0 ? 130 : 90 - b.in * 10, `birthday ${birthdayWhen(b.in)}`, "birthday");
+    const w = G.thisWeek.find((t) => t.name === p.name && !t.done);
+    if (w) add(70, `this week's tending${w.gesture ? `: ${w.gesture}` : ""}`, "tend");
+    const d = recent.get(p.name);
+    if (d) add(60, `a draft to finish${d.title ? `: ${d.title}` : ""}`, "finish");
+    const until = p.watch ? daysUntil(p.watch.until) : null;
+    if (until != null && until >= 0 && until <= 2) add(55, `watching, ${until === 0 ? "ends today" : `ends in ${until} day${until > 1 ? "s" : ""}`}${p.watch.why ? `: ${p.watch.why}` : ""}`, "write");
+    if (["core", "close", "new"].includes(p.ring) && ["thirsty", "wilting"].includes(p.thirst) && !p.waitingSince)
+      add((p.thirst === "wilting" ? 50 : 35) + Math.min(15, (p.daysSince ?? 0) / p.interval), sinceText(p), "write");
+    if (!why.length) continue;
+    why.sort((a, b) => b.score - a.score);
+    const r = rhythmOf(p.name);
+    const around = r && (now - r.lastReceived < 15 * 60_000 || (r.lift >= 1.5 && r.n >= 20));
+    const score = why[0].score + why.slice(1).reduce((a, x) => a + x.score / 10, 0) + (p.pinned != null ? 10 : 0) + (around ? 15 : 0);
+    out.push({ p, why, score, around, rhythm: r, draft: d, gesture: w?.gesture });
+  }
+  return out.sort((a, b) => b.score - a.score);
 }
+function todayAction(x) {
+  const { p, why } = x, n = esc(p.name), lead = why[0].act;
+  const best = x.rhythm ? ` (${rhythmLine(x.rhythm)})` : "";
+  const run = (label, prompt) => `<button class="tiny" data-run="${esc(prompt)}">${label}</button>`;
+  if (lead === "reply") return run("Reply", `/beeper:thread-reply ${p.name}${best}`);
+  if (lead === "birthday") return run("Write", `/beeper:thread-reply ${p.name} — their birthday is ${p.nextBirthday.date}${best}`);
+  if (lead === "finish") return run("Finish", `/beeper:thread-reply ${p.name} — finish the draft of ${x.draft.date}${x.draft.title ? `: ${x.draft.title}` : ""}`);
+  if (lead === "tend") return run("Write", `/beeper:thread-reply ${p.name} — gesture: ${x.gesture ?? ""}${best}`);
+  return run("Write", `/beeper:thread-reply ${p.name}${best}`);
+}
+function todaySection() {
+  const all = todayQueue(), list = all.slice(0, TODAY_SHOWN);
+  const done = G.plants.filter((p) => p.lastTended === G.today).length;
+  const doneLine = done ? `<span class="today-done">✓ ${done} tended today</span>` : "";
+  if (!list.length)
+    return `<section class="panel today-panel"><h2>Today ${doneLine}</h2><p class="muted">No one is asking for you today. The garden is watered.</p></section>`;
+  const row = (x) => {
+    const { p, why } = x;
+    const when = x.rhythm ? (x.around ? `<span class="badge around-badge">around now</span>` : `<span class="muted today-when">${esc(rhythmWhen(x.rhythm))}</span>`) : "";
+    return `<li data-wcard="${esc(p.name)}"><div class="today-head"><button class="linkish name" data-sheet="${esc(p.name)}">${esc(p.name)}</button>
+        <span class="ring-tag">${esc(RING_NAME[p.ring])}</span>${when}</div>
+      <div class="why">${esc(why[0].text)}</div>
+      ${why.length > 1 ? `<div class="muted today-also">also ${why.slice(1).map((w) => esc(w.text)).join(" · ")}</div>` : ""}
+      <div class="ops">${todayAction(x)}<button class="water tiny" data-water="${esc(p.name)}">Tended</button><button class="tiny ghost" data-not-today="${esc(p.name)}" title="Hide until tomorrow">Not today</button></div>
+      <span class="wave" aria-hidden="true"></span></li>`;
+  };
+  const more = all.length - list.length;
+  return `<section class="panel today-panel"><h2>Today <span class="sub">${list.length === 1 ? "one person" : `${list.length} people`} to reach, most pressing first</span>${doneLine}</h2>
+    <ul class="today-list">${list.map(row).join("")}</ul>
+    ${more > 0 ? `<details class="today-more"${todayMoreOpen ? " open" : ""}><summary>${more} more, quieter</summary><ul class="today-list">${all.slice(TODAY_SHOWN).map(row).join("")}</ul></details>` : ""}</section>`;
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-not-today]");
+  if (!b) return;
+  store.set(`hearth.notToday.${G.today}`, JSON.stringify([...notToday(), b.dataset.notToday]));
+  render();
+});
 
 const BIRTHDAY_AHEAD = 45; // days of birthdays the Kin screen looks ahead
 const SOON = 14; // a birthday this close puts a candle on the plant
@@ -382,13 +440,14 @@ const EVENT_GLYPH = { birthday: "🎂", watch: "⚑", now: "✦", listen: "👂"
 const MOON_GLYPH = { "new moon": "🌑", "full moon": "🌕" };
 let forecastPick = null; // the day opened in the forecast; null for the first day with something on it
 
-function forecastPrompt(f) {
+function forecastPrompt(f, scope) {
   const line = (date, e) => `- ${date} · ${e.what}${e.why ? ` (${e.why})` : ""}`;
   const ahead = f.days.flatMap((d) => [...d.events.map((e) => line(d.date, e)), ...(d.moon ? [`- ${d.date} · ${d.moon}`] : [])]);
   const carried = f.carried.map((e) => line(e.date, e));
-  return `Here is my Hearth forecast for ${f.today} to ${f.last}, from the kin map and Hearth.md:\n${ahead.join("\n") || "- nothing dated"}${
+  const about = scope === "kin" ? "the people: birthdays and who I'm watching, from the kin map and Hearth.md" : "inner work: the Now list, experiments to listen back to, and the moon, from Hearth.md and Rough Notes";
+  return `Here is my Hearth forecast for ${f.today} to ${f.last}, ${about}:\n${ahead.join("\n") || "- nothing dated"}${
     carried.length ? `\n\nPassed but still in Hearth.md:\n${carried.join("\n")}` : ""
-  }\n\nRead the next two weeks with me: which days need care, what should I prepare now so it isn't a rush, and which passed dates to close or move. Short, then ask me one question. Don't write anything to the vault unless I ask.`;
+  }\n\n${scope === "kin" ? "Read the next two weeks of people with me: who to prepare something for now, which days are crowded, and which passed dates to close or move." : "Read the next two weeks of inner work with me: what to make room for, which dates to keep and which to let go."} Short, then ask me one question. Don't write anything to the vault unless I ask.`;
 }
 
 function forecastEvent(e, date) {
@@ -400,9 +459,18 @@ function forecastEvent(e, date) {
   return `<li class="fc-${e.kind}">${who}${op ? `<span class="ops">${op}</span>` : ""}${e.why ? `<div class="why muted">${esc(e.why)}</div>` : ""}</li>`;
 }
 
-function forecastSection() {
-  const f = S.forecast;
-  if (!f) return "";
+// Each screen forecasts its own world: Kin the people (birthdays, watch dates), Inner the inner work (Now, listen backs, the moon).
+const FORECAST_KINDS = { kin: ["birthday", "watch"], inner: ["now", "listen"] };
+const weatherFor = (n) => (n === 0 ? "clear" : n === 1 ? "fair" : n === 2 ? "cloudy" : "stormy");
+function forecastSection(scope = "kin") {
+  const all = S.forecast;
+  if (!all) return "";
+  const kinds = FORECAST_KINDS[scope];
+  const days = all.days.map((d) => {
+    const events = d.events.filter((e) => kinds.includes(e.kind)), moon = scope === "inner" ? d.moon : null;
+    return { ...d, events, moon, weather: weatherFor(events.length) };
+  });
+  const f = { ...all, days, carried: all.carried.filter((e) => kinds.includes(e.kind)) };
   const busy = f.days.filter((d) => d.events.length);
   const pick = f.days.find((d) => d.date === forecastPick) ?? busy[0] ?? f.days[0];
   const cells = f.days.map((d, i) => {
@@ -423,8 +491,8 @@ function forecastSection() {
     ? `<div class="label">Carried over <span class="muted">passed, still in Hearth.md</span></div><ul class="frost">${f.carried
         .map((e) => forecastEvent({ ...e, why: `${birthdayDay(e.date)}${e.why ? ` · ${e.why}` : ""}` }, e.date)).join("")}</ul>`
     : "";
-  return `<section class="panel forecast"><h2>Forecast <span class="sub">${busy.length ? `${busy.length} of the next ${f.days.length} days hold something` : `the next ${f.days.length} days are clear`}</span>
-      <button class="tiny ghost" data-run="${esc(forecastPrompt(f))}" title="Ask your AI buddy to read the two weeks ahead with you">Read the weeks ahead</button></h2>
+  return `<section class="panel forecast" data-scope="${scope}"><h2>Forecast <span class="sub">${busy.length ? `${busy.length} of the next ${f.days.length} days hold something` : `the next ${f.days.length} days are clear`}</span>
+      <button class="tiny ghost" data-run="${esc(forecastPrompt(f, scope))}" title="Ask your AI buddy to read the two weeks ahead with you">Read the weeks ahead</button></h2>
     <div class="fc-strip" role="group" aria-label="The next ${f.days.length} days">${cells}</div>
     <div class="label">${esc(when)}</div>${list}${carried}</section>`;
 }
@@ -432,7 +500,7 @@ document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-forecast]");
   if (!b) return;
   forecastPick = b.dataset.forecast;
-  for (const el of document.querySelectorAll(".forecast")) el.outerHTML = forecastSection();
+  for (const el of document.querySelectorAll(".forecast")) el.outerHTML = forecastSection(el.dataset.scope);
 });
 
 function frostSection() {
@@ -642,15 +710,20 @@ function rhythmBox(name) {
     <p>${rhythmSpark(r)}</p><p>${esc(rhythmLine(r))}</p>
     ${slow ? `<p class="muted">They answer faster than you do; a short line in their hours goes a long way.</p>` : ""}</div>`;
 }
+let rhLoading = false;
 async function loadRhythms() {
-  if (RH || !S.beeper) return;
+  // Once, then again when ten minutes old, so "around now" follows the clock.
+  if (rhLoading || !S.beeper || (RH && Date.now() - RH.at < 600_000)) return;
+  rhLoading = true;
   try {
     const r = await (await fetch("/api/rhythms")).json();
     if (r.error) return;
     RH = r;
-  } catch { return; }
+  } catch { return; } finally { rhLoading = false; }
   const box = $("#sheet[open] .rhythm-box");
   if (box) box.outerHTML = rhythmBox(box.dataset.rhythm);
+  const today = $(".today-panel");
+  if (today) today.outerHTML = todaySection();
 }
 function aroundSection() {
   if (!RH) return "";
@@ -856,14 +929,33 @@ $("#servers").addEventListener("click", (e) => { if (e.target === $("#servers"))
 // Inner is the first screen; the kin garden is #kin; who Alex talks to is #talk.
 // Talk needs Beeper on this machine; without it the tab goes away and #talk falls back to Inner.
 const screen = () => (location.hash === "#kin" ? "kin" : location.hash === "#talk" && S?.beeper ? "talk" : "inner");
+// The line under the date belongs to the screen: practice on Inner, contact on Kin, Beeper on Talk.
+function headerLine(s) {
+  if (!G) return;
+  const week = Array.from({ length: 7 }, (_, i) => new Date(Date.parse(G.today) - (6 - i) * 864e5).toISOString().slice(0, 10));
+  const dots = (days, word) => `<span class="dots">${days.map((d) => `<i class="${d.on ? "on" : ""}" title="${esc(d.date)}${d.on ? ` · ${word}` : ""}"></i>`).join("")}</span>`;
+  if (s === "talk") { $("#rhythm").innerHTML = `<span class="muted">📊 direct chats, live from Beeper · counts and times, never the words</span>`; return; }
+  if (s === "inner") {
+    const lit = new Set([...(S.thinking?.days ?? []), ...(S.innerScreen?.proprioception?.days ?? [])]);
+    const days = week.map((date) => ({ date, on: lit.has(date) })), n = days.filter((d) => d.on).length;
+    $("#rhythm").innerHTML = `${dots(days, "practised")}<span class="muted">${n ? `practised on ${n} of the last 7 days` : "no practice logged this week yet"}</span>`;
+    return;
+  }
+  const active = G.rhythm.filter((r) => r.active).length;
+  $("#rhythm").innerHTML = G.rhythm.length
+    ? `${dots(G.rhythm.map((r) => ({ date: r.date, on: r.active })), "in touch")}<span class="muted">${active ? `in touch on ${active} of the last 7 days` : "a quiet week so far"}</span>`
+    : "";
+}
 function showScreen() {
   const s = screen();
-  $('[data-screen="talk"]').hidden = !S?.beeper;
+  document.querySelectorAll('[data-screen="talk"]').forEach((a) => (a.hidden = !S?.beeper));
   $("#kinScreen").hidden = s !== "kin";
   $("#innerScreen").hidden = s !== "inner";
   $("#talkScreen").hidden = s !== "talk";
   if (s === "talk") loadTalk(); else clearInterval(talkTimer);
   document.body.dataset.screen = s;
+  headerLine(s);
+  placeholder();
   document.querySelectorAll("[data-screen]").forEach((a) => a.setAttribute("aria-current", a.dataset.screen === s ? "page" : "false"));
 }
 window.addEventListener("hashchange", () => { showScreen(); window.scrollTo(0, 0); });
@@ -1058,7 +1150,7 @@ function innerScreen() {
   return [
     skySection(),
     nowSection(),
-    forecastSection(),
+    forecastSection("inner"),
     emberSection(),
     innerLaunch(),
     soilSection(),
@@ -1081,6 +1173,13 @@ async function loadMenu() {
   }
 }
 
+// Which plugins each screen is about, for the menu's order and the conversation's first words.
+const SCREEN_PLUGINS = { inner: ["inner-work", "thinking", "readings", "writing"], kin: ["kin", "beeper"], talk: ["beeper", "kin"] };
+const SCREEN_CHAT = {
+  inner: ["Bring a dream, a feeling, something that landed hard, or open the menu for a practice.", "What's alive in you…"],
+  kin: ["Pick a person from Today or the map to write, tend or repair, or ask who needs you this week.", "Ask about someone, or who to reach…"],
+  talk: ["Ask what the shifts mean, or who to answer first.", "Ask about who you talk to…"],
+};
 function renderMenu() {
   const q = $("#menuSearch").value.trim().toLowerCase();
   const hit = (...xs) => !q || xs.some((x) => String(x ?? "").toLowerCase().includes(q));
@@ -1089,7 +1188,10 @@ function renderMenu() {
     .filter(({ a }) => hit(a.label, a.hint, a.prompt))
     .map(({ a, i }) => `<button class="menu-item" data-action="${i}"><span><span class="menu-name">${esc(a.label)}</span><span class="menu-hint">${esc(a.hint ?? "")}</span></span></button>`)
     .join("");
-  const groups = MENU.map((g) => {
+  // The current screen's plugins come first; the rest keep their order.
+  const first = SCREEN_PLUGINS[screen()] ?? [];
+  const rank = (g) => (first.includes(g.plugin) ? first.indexOf(g.plugin) : first.length);
+  const groups = [...MENU].sort((a, b) => rank(a) - rank(b)).map((g) => {
     const items = g.items.filter((it) => hit(it.name, it.hint, it.command, g.plugin, ...(SKILL_MODES[it.command] ?? []).map((m) => m[2])));
     if (!items.length) return "";
     return `<section class="menu-group"><h3>${g.icon} ${esc(g.plugin)}</h3><div class="menu">${items.map((it) => {
@@ -1112,6 +1214,7 @@ async function openMenu() {
   $("#menuSearch").focus();
 }
 $("#menuOpen").onclick = openMenu;
+document.querySelector("[data-open-menu]").onclick = openMenu;
 loadMenu();
 $("#menuSearch").addEventListener("input", renderMenu);
 $("#menuSearch").addEventListener("keydown", (e) => {
@@ -1412,13 +1515,20 @@ function renderQueue() {
 
 function flushQueue() {
   if (!queue.length) return;
-  const text = queue.join("\n\n");
+  const parts = queue;
   queue = []; renderQueue();
   if (stopAsked) {
+    const text = parts.join("\n\n");
     const box = $("#input");
     box.value = box.value.trim() ? `${text}\n\n${box.value}` : text;
     box.focus();
-  } else send(text);
+    return;
+  }
+  if (parts.length === 1) { send(parts[0]); return; }
+  // Several lines written while it worked are one thought in pieces: each shows as he wrote it, and
+  // they go out as one message that asks for one reply, not an answer to each in turn.
+  for (const m of parts) copyable(append("msg user", esc(m)), m);
+  send(`[I wrote these ${parts.length} messages while you were working. Read them all first and answer them together, in one reply; don't take them one by one.]\n\n${parts.map((m) => `> ${m.replace(/\n/g, "\n> ")}`).join("\n\n")}`, true);
 }
 
 /* Attachments: the browser hides real paths, so files go to the server and Claude reads the copy.
@@ -1678,8 +1788,19 @@ $("#form").addEventListener("submit", async (e) => {
   send(await withAttachments(v));
 });
 $("#input").addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#form").requestSubmit(); }
+  // On a touch screen Enter is a new line, as in any messaging app; Send sends.
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !TOUCH.matches) { e.preventDefault(); $("#form").requestSubmit(); }
 });
+const TOUCH = matchMedia("(hover: none) and (pointer: coarse)");
+// The empty conversation speaks to the screen you are on.
+const placeholder = () => {
+  const [hint, ask] = SCREEN_CHAT[screen()] ?? SCREEN_CHAT.inner;
+  $("#input").placeholder = TOUCH.matches ? ask : `${ask} (Enter to send, Shift+Enter for a new line)`;
+  const h = $("#log > .hint:only-child");
+  if (h) h.textContent = hint;
+};
+placeholder();
+TOUCH.addEventListener?.("change", placeholder);
 // The model picker: Claude Code's own list, remembered per browser, applied from the next turn on.
 (async () => {
   const pick = $("#model");
@@ -1756,7 +1877,8 @@ let lastInput = Date.now();
 let autoLock = store.get("hearth.autoLock") === "1";
 function showAutoLock() {
   const b = $("#autoLock");
-  b.textContent = autoLock ? "⏱ Auto-lock on" : "⏱ Auto-lock off";
+  b.innerHTML = `<span aria-hidden="true">⏱</span><span class="power-text"> Auto-lock ${autoLock ? "on" : "off"}</span>`;
+  b.setAttribute("aria-label", autoLock ? "Auto-lock is on" : "Auto-lock is off");
   b.title = autoLock
     ? `Locks this browser after ${lockAfter()} seconds with no input. Click to turn it off`
     : "Auto-lock is off on this browser. Click to turn it on";
@@ -1933,3 +2055,4 @@ resizer.addEventListener("keydown", (e) => {
 });
 // A smaller window must not leave the panel wider than the page allows.
 window.addEventListener("resize", () => setChatWidth(parseInt(getComputedStyle(document.documentElement).getPropertyValue("--chat-w")) || CHAT_W.def, false));
+document.addEventListener("toggle", (e) => { if (e.target.matches?.(".today-more")) todayMoreOpen = e.target.open; }, true);
