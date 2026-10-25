@@ -153,7 +153,7 @@ Bun.serve({
 
     "/api/chat": {
       POST: async (req) => {
-        const { message, sessionId, model, autoAllow } = (await req.json()) as { message?: string; sessionId?: string; model?: string; autoAllow?: boolean | string };
+        const { message, sessionId, model, autoAllow, runId } = (await req.json()) as { message?: string; sessionId?: string; model?: string; autoAllow?: boolean | string; runId?: string };
         // true is what a page from before the "most" mode sends for Auto-allow on.
         const mode: AutoAllow = autoAllow === true || autoAllow === "all" ? "all" : autoAllow === "most" ? "most" : "off";
         if (!message?.trim()) return Response.json({ error: "empty message" }, { status: 400 });
@@ -161,7 +161,7 @@ Bun.serve({
         const stream = new ReadableStream({
           async start(c) {
             try {
-              for await (const e of chat(message, vault, sessionId, model && model !== "default" ? model : undefined, mode))c.enqueue(enc.encode(sse(e)));
+              for await (const e of chat(message, vault, sessionId, model && model !== "default" ? model : undefined, mode, typeof runId === "string" && runId ? runId : undefined)) c.enqueue(enc.encode(sse(e)));
             } catch (e) {
               c.enqueue(enc.encode(sse({ type: "error", message: (e as Error).message })));
             }
@@ -228,8 +228,9 @@ Bun.serve({
     },
 
     "/api/stop": {
-      POST: () => {
-        stop();
+      POST: async (req) => {
+        const { runId } = (await req.json().catch(() => ({}))) as { runId?: unknown };
+        stop(typeof runId === "string" && runId ? runId : undefined);
         return Response.json({ ok: true });
       },
     },

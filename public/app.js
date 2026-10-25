@@ -1258,6 +1258,8 @@ function updateRailDot() {
 
 let sessionId = null;
 let running = false;
+// This tab's turn in flight, so Stop ends it and not another tab's.
+let runId = null;
 let bubble = null;
 let bubbleText = "";
 
@@ -1577,11 +1579,13 @@ async function send(message, again = false) {
   if (!again) copyable(append("msg user", esc(message)), message);
   bubble = null; bubbleText = "";
   setRunning(true);
+  // randomUUID only exists on https or localhost; a phone on plain http gets the fallback.
+  runId = crypto.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
   try {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ message, ...(sessionId && { sessionId }), ...($("#model").value && { model: $("#model").value }), ...(autoAllow !== "off" && { autoAllow }) }),
+      body: JSON.stringify({ message, runId, ...(sessionId && { sessionId }), ...($("#model").value && { model: $("#model").value }), ...(autoAllow !== "off" && { autoAllow }) }),
     });
     if (!res.ok || !res.body) throw new Error(`${res.status} ${await res.text()}`);
     const reader = res.body.getReader();
@@ -1697,7 +1701,7 @@ $("#input").addEventListener("keydown", (e) => {
   if ([...pick.options].some((o) => o.value === saved)) pick.value = saved;
 })();
 
-$("#stop").onclick = () => (stopAsked = true, fetch("/api/stop", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }));
+$("#stop").onclick = () => (stopAsked = true, fetch("/api/stop", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ runId }) }));
 $("#newChat").onclick = () => {
   if (running) return;
   if ($(".msg", $("#log")) && !confirm("Start a new conversation? This one stays in your AI buddy's history but leaves this panel.")) return;

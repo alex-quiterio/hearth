@@ -16,7 +16,10 @@ export type ChatEvent =
   | { type: "error"; message: string };
 
 const pending = new Map<string, (r: PermissionResult) => void>();
-let running: AbortController | null = null;
+// Every turn in flight, by the run id its page sent, so tabs work side by side and Stop ends only its own.
+const runs = new Map<string, AbortController>();
+// Conversations with a turn in flight, to the run holding them: one turn at a time per session.
+const busy = new Map<string, string>();
 
 /** why: the optional reason typed on the Deny card, passed on so the next step can take it into account. */
 export function answerPermission(id: string, allow: boolean, why = ""): boolean {
@@ -28,8 +31,10 @@ export function answerPermission(id: string, allow: boolean, why = ""): boolean 
   return true;
 }
 
-export function stop() {
-  running?.abort();
+/** Stops one run, or every run when no id is given (what a page from before run ids sends). */
+export function stop(runId?: string) {
+  if (runId) runs.get(runId)?.abort();
+  else for (const a of runs.values()) a.abort();
 }
 
 const READ_ONLY = new Set(["Read", "Glob", "Grep", "Skill", "ToolSearch", "WebSearch", "WebFetch", "TodoWrite", "Agent", "Task"]);
@@ -155,10 +160,16 @@ export function listModels(): Promise<ModelInfo[]> {
 }
 
 /** autoAllow: the page's Auto-allow. "most" runs everything without asking except Beeper changes; "all" lets Beeper sends through too. */
-export async function* chat(message: string, vault: string, sessionId?: string, model?: string, autoAllow: AutoAllow = "off"): AsyncGenerator<ChatEvent> {
-  running?.abort();
+export async function* chat(message: string, vault: string, sessionId?: string, model?: string, autoAllow: AutoAllow = "off", runId: string = crypto.randomUUID()): AsyncGenerator<ChatEvent> {
+  // Another tab is mid-turn in this conversation: resuming it twice at once would fork it, so wait instead of stopping it.
+  if (sessionId && busy.has(sessionId)) {
+    yield { type: "error", message: "This conversation is still working in another tab. Wait for it to finish, or start a new conversation here." };
+    return;
+  }
   const abort = new AbortController();
-  running = abort;
+  runs.set(runId, abort);
+  let held = sessionId;
+  if (held) busy.set(held, runId);
   const queue: ChatEvent[] = [];
   let wake: (() => void) | null = null;
   const push = (e: ChatEvent) => {
@@ -196,7 +207,10 @@ export async function* chat(message: string, vault: string, sessionId?: string, 
   const pump = (async () => {
     try {
       for await (const m of q) {
-        if (m.type === "system" && m.subtype === "init") push({ type: "session", sessionId: m.session_id });
+        if (m.type === "system" && m.subtype === "init") {
+          if (!held) busy.set((held = m.session_id), runId);
+          push({ type: "session", sessionId: m.session_id });
+        }
         else if (m.type === "stream_event") {
           const ev = m.event as any;
           if (m.parent_tool_use_id) continue;
@@ -230,17 +244,21 @@ export async function* chat(message: string, vault: string, sessionId?: string, 
     }
   })();
 
-  while (true) {
-    if (!queue.length) await new Promise<void>((r) => (wake = r));
-    wake = null;
-    while (queue.length) {
-      const e = queue.shift()!;
-      if (e.type === "status" && e.text === "__end__") {
-        await pump;
-        if (running === abort) running = null;
-        return;
+  try {
+    while (true) {
+      if (!queue.length) await new Promise<void>((r) => (wake = r));
+      wake = null;
+      while (queue.length) {
+        const e = queue.shift()!;
+        if (e.type === "status" && e.text === "__end__") {
+          await pump;
+          return;
+        }
+        yield e;
       }
-      yield e;
     }
+  } finally {
+    runs.delete(runId);
+    if (held && busy.get(held) === runId) busy.delete(held);
   }
 }
