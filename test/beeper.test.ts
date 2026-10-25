@@ -3,7 +3,7 @@ import { Database } from "bun:sqlite";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { talk, beeperOn, shifts, unread } from "../src/beeper";
+import { talk, beeperOn, shifts, unread, rhythms } from "../src/beeper";
 
 // A tiny Beeper index with just the columns talk() reads.
 function fixture() {
@@ -123,4 +123,35 @@ test("unread: Beeper's count, the newest unread lines and reactions, kin map peo
   expect(mira.messages.map((m) => m.text)).toEqual(["are you free sunday?", "📷 photo"]);
   expect(mira.reactions).toEqual(["❤️"]);
   expect(mira.last).toBe(NOW - 10 * 60_000);
+});
+
+test("rhythms: their hours, and how fast each side answers, kin only", () => {
+  const file = join(mkdtempSync(join(tmpdir(), "beeper-")), "index.db");
+  const db = new Database(file);
+  db.run(`create table threads (threadID text primary key, accountID text, thread json)`);
+  db.run(`create table participants (account_id text, room_id text, id text, full_name text, nickname text, is_self int, is_network_bot int)`);
+  db.run(`create table mx_room_messages (roomID text, timestamp int, isDeleted int, type text, isSentByMe int)`);
+  for (const [id, name] of [["a", "Ada Lovelace"], ["s", "Stranger"]] as const) {
+    db.run(`insert into threads values (?, 'signal.1', ?)`, [id, JSON.stringify({ type: "single" })]);
+    db.run(`insert into participants values ('signal.1', ?, ?, ?, null, 0, 0)`, [id, `@${id}`, name]);
+  }
+  const msg = (room: string, at: number, me: number) => db.run(`insert into mx_room_messages values (?, ?, 0, 'TEXT', ?)`, [room, at, me]);
+  // Twenty evenings: Alex writes at 20:00 local, Ada answers 10 minutes later, Alex answers her an hour after that.
+  for (let d = 1; d <= 20; d++) {
+    const eve = new Date(NOW - d * 86_400_000); eve.setHours(20, 0, 0, 0);
+    msg("a", eve.getTime(), 1); msg("a", eve.getTime() + 10 * 60_000, 0); msg("a", eve.getTime() + 70 * 60_000, 1);
+    msg("s", eve.getTime(), 0);
+  }
+  db.close();
+  const at = new Date(NOW); at.setHours(20, 30, 0, 0);
+  const r = rhythms([{ name: "Ada Lovelace", ring: "core" }], file, at.getTime());
+  if ("error" in r) throw new Error(r.error);
+  expect(r.people.map((p) => p.name)).toEqual(["Ada Lovelace"]);
+  const ada = r.people[0]!;
+  expect([ada.n, ada.hours[20], ada.theyAnswer, ada.youAnswer]).toEqual([20, 20, 10, 60]);
+  expect(ada.peak.from <= 20 && ada.peak.to > 20).toBe(true);
+  expect(r.around).toEqual(["Ada Lovelace"]);
+  const morning = new Date(NOW); morning.setHours(8, 0, 0, 0);
+  const m = rhythms([{ name: "Ada Lovelace", ring: "core" }], file, morning.getTime());
+  expect("error" in m ? m.error : m.around).toEqual([]);
 });

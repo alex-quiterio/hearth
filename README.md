@@ -91,6 +91,13 @@ mother on Signal and on WhatsApp is one person and a tap opens her sheet. **Brin
 hands the shifts to `/kin:hearth`, which updates `pinned`, `watch` and Now in Hearth.md; Hearth
 itself still writes nothing. The tab hides when Beeper is not on the machine.
 
+**Rhythms.** From half a year of Beeper timestamps (never the text), Hearth learns when each kin map person
+writes and how fast each side answers. **Around now** on Talk lists the kin whose usual hours include this
+one, or who wrote in the last quarter hour, each with **Write now**. Every person's sheet shows a 🕰 Rhythm:
+their hours as 24 small bars with now marked, their busiest three hours and day, how fast they answer you
+and you them. When you're much slower than they are, it says so. Hours are this Mac's local time;
+someone needs 20 messages before they count as around.
+
 ## Attachments
 
 Drop files on the chat, paste an image, or use 📎. The browser never reveals a file's path, so

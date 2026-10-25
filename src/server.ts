@@ -7,7 +7,7 @@ import { sessions, transcript, forget } from "./history";
 import { saveAttachment, vaultFile, sweepAttachments, type Attachment } from "./attach";
 import { loadAuth, authed, login, logout, onThisMac, AUTH_FILE } from "./auth";
 import { menu } from "./menu";
-import { talk, beeperOn, shifts, unread } from "./beeper";
+import { talk, beeperOn, shifts, unread, rhythms } from "./beeper";
 
 const vault = await findVault();
 const PORT = Number(process.env.HEARTH_PORT ?? 4747);
@@ -111,6 +111,13 @@ Bun.serve({
       const kin = kinPeople(await kinState(vault)).map((p) => ({ name: p.name, ring: p.ring, aka: p.aka }));
       const s = shifts(kin);
       return Response.json(s, { status: "error" in s ? 503 : 200 });
+    },
+    // When each kin person writes and how fast each side answers, from timestamps only.
+    "/api/rhythms": async () => {
+      if (!beeperOn()) return Response.json({ error: "Beeper is off on this machine" }, { status: 404 });
+      const kin = kinPeople(await kinState(vault)).map((p) => ({ name: p.name, ring: p.ring, aka: p.aka }));
+      const r = rhythms(kin);
+      return Response.json(r, { status: "error" in r ? 503 : 200 });
     },
     // Direct chats with unread messages, and the newest unread lines in each.
     "/api/unread": async () => {

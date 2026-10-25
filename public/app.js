@@ -540,6 +540,7 @@ let talkTimer = null;
 let T = null;
 let SH = null; // shifts: warming, cooling, quiet, waiting
 let UN = null; // direct chats with unread messages
+let RH = null; // rhythms: when each kin person writes, how fast each side answers
 let unreadOpen = false; // the To be read section stays as Alex left it across the minute's refetch
 const DAY_MS = 86_400_000;
 const n0 = (n) => n.toLocaleString("en");
@@ -553,7 +554,7 @@ async function loadTalk() {
 }
 async function fetchTalk() {
   try {
-    const [res, sh, un] = await Promise.all([fetch(`/api/talk?days=${talkDays}`), fetch("/api/shifts").catch(() => null), fetch("/api/unread").catch(() => null)]);
+    const [res, sh, un, rh] = await Promise.all([fetch(`/api/talk?days=${talkDays}`), fetch("/api/shifts").catch(() => null), fetch("/api/unread").catch(() => null), fetch("/api/rhythms").catch(() => null)]);
     const t = await res.json();
     if (t.error) throw new Error(t.error);
     T = t;
@@ -561,6 +562,8 @@ async function fetchTalk() {
     SH = s && !s.error ? s : null;
     const u = un?.ok ? await un.json() : null;
     UN = u && !u.error ? u : null;
+    const r = rh?.ok ? await rh.json() : null;
+    RH = r && !r.error ? r : null;
   } catch (e) {
     $("#talkScreen").innerHTML = `<section class="panel talk"><h2>Who I talk to</h2><p class="muted">${esc(e.message)}</p></section>`;
     return;
@@ -600,6 +603,67 @@ function shiftsSection() {
     <div class="shifts">${Object.keys(SHIFT).map(col).join("")}</div>
     <div class="shift-bar"><button class="tool gardener" data-run="${esc(shiftsPrompt())}" title="Ask /kin:hearth to update pinned, watch and Now from these shifts">Bring into the hearth</button>
     <span class="muted">Kin map people first; tap one to open them.</span></div>`;
+}
+
+// Rhythms: when each kin person writes and how fast each side answers, from Beeper's timestamps.
+// "Around now" is who is likely to be on their phone this hour; the sheet shows anyone's rhythm.
+const WEEKDAY = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
+const minsText = (m) => (m < 60 ? `~${Math.max(1, m)} min` : m < 1440 ? `~${Math.round(m / 60)} h` : `~${Math.round(m / 1440)} days`);
+const inPeak = (r, h) => (r.peak.from < r.peak.to ? h >= r.peak.from && h < r.peak.to : h >= r.peak.from || h < r.peak.to);
+const rhythmOf = (name) => RH?.people.find((r) => r.name === name) ?? null;
+function rhythmWhen(r) {
+  const h = new Date().getHours();
+  if (inPeak(r, h)) return "this is their hour";
+  const n = (r.peak.from - h + 24) % 24;
+  return `their hours start in ${n} h`;
+}
+function rhythmLine(r) {
+  const top = r.weekdays.indexOf(Math.max(...r.weekdays));
+  return [
+    `writes most ${r.peak.from}–${r.peak.to}h${r.weekdays[top] > r.n / 4 ? `, ${WEEKDAY[top]}` : ""}`,
+    r.theyAnswer != null ? `answers you in ${minsText(r.theyAnswer)}` : "",
+    r.youAnswer != null ? `you answer in ${minsText(r.youAnswer)}` : "",
+  ].filter(Boolean).join(" · ");
+}
+/** Their messages over the 24 hours as small bars, this hour marked. */
+function rhythmSpark(r) {
+  const max = Math.max(...r.hours, 1), h = new Date().getHours();
+  const bars = r.hours.map((c, i) => `<rect x="${i * 5}" y="${20 - (c / max) * 18}" width="4" height="${Math.max(1, (c / max) * 18)}" rx="1" class="${i === h ? "now" : inPeak(r, i) ? "peak" : ""}"><title>${i}h · ${c}</title></rect>`).join("");
+  return `<svg class="spark" viewBox="0 0 120 22" width="120" height="22" role="img" aria-label="When they write, by hour; now is ${h}h">${bars}</svg>`;
+}
+function rhythmBox(name) {
+  if (!S.beeper) return "";
+  const r = rhythmOf(name);
+  if (!RH) return `<div class="sheet-box rhythm-box" data-rhythm="${esc(name)}"><strong>🕰 Rhythm</strong><p class="muted">Reading Beeper…</p></div>`;
+  if (!r) return `<div class="sheet-box rhythm-box" data-rhythm="${esc(name)}"><strong>🕰 Rhythm</strong><p class="muted">Too few messages in the last half year to know their hours.</p></div>`;
+  // The mirror: when Alex is much slower than they are, say so gently.
+  const slow = r.youAnswer != null && r.theyAnswer != null && r.youAnswer > 60 && r.youAnswer > 3 * r.theyAnswer;
+  return `<div class="sheet-box rhythm-box" data-rhythm="${esc(name)}"><strong>🕰 Rhythm</strong> <span class="muted">${esc(rhythmWhen(r))}</span>
+    <p>${rhythmSpark(r)}</p><p>${esc(rhythmLine(r))}</p>
+    ${slow ? `<p class="muted">They answer faster than you do; a short line in their hours goes a long way.</p>` : ""}</div>`;
+}
+async function loadRhythms() {
+  if (RH || !S.beeper) return;
+  try {
+    const r = await (await fetch("/api/rhythms")).json();
+    if (r.error) return;
+    RH = r;
+  } catch { return; }
+  const box = $("#sheet[open] .rhythm-box");
+  if (box) box.outerHTML = rhythmBox(box.dataset.rhythm);
+}
+function aroundSection() {
+  if (!RH) return "";
+  const list = RH.around.map(rhythmOf).filter(Boolean).slice(0, 8);
+  const row = (r) => {
+    const fresh = Date.now() - r.lastReceived < 15 * 60_000;
+    const prompt = `/beeper:thread-reply ${r.name} — they are likely around now (${rhythmLine(r)}), so a line now may turn into a live chat`;
+    return `<li><button class="name" data-sheet="${esc(r.name)}">${esc(r.name)}</button><span class="ring-tag">${esc(r.ring)}</span>
+      ${rhythmSpark(r)}<small>${fresh ? `wrote ${esc(agoMs(r.lastReceived))} · ` : ""}${esc(rhythmLine(r))}</small>
+      <button class="tiny ghost" data-run="${esc(prompt)}" title="Draft a line while they're around">Write now</button></li>`;
+  };
+  return `<h3>Around now <span class="sub">kin who usually write at this hour, from half a year of timestamps</span></h3>
+    ${list.length ? `<ul class="around">${list.map(row).join("")}</ul>` : `<p class="muted">No one's usual hour. A message now will likely wait until later.</p>`}`;
 }
 
 // Kin waiting on a reply past twice their window: the red end of the reply clock. The garden
@@ -647,6 +711,7 @@ function renderTalk() {
   const head = `<h2>Who I talk to <span class="sub">direct chats on Beeper · updated ${new Date(T.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></h2>
     ${replyAlert()}
     ${unreadSection()}
+    ${aroundSection()}
     <div class="talk-bar"><div class="talk-days" role="group" aria-label="Time window">${[7, 30, 90, 365].map((d) => `<button class="ghost" data-talk-days="${d}" aria-pressed="${d === talkDays}">${d === 7 ? "Last week" : d === 365 ? "1 year" : `${d} days`}</button>`).join("")}</div>
     <button class="ghost" data-talk-refresh title="Count again from Beeper">↻ Refresh</button></div>`;
   if (!N) { $("#talkScreen").innerHTML = `<section class="panel talk">${head}<p class="muted">No direct messages in this window.</p></section>`; return; }
@@ -1087,6 +1152,7 @@ function openSheet(name) {
     ${w ? `<div class="sheet-box">${kindChip(w.kind)} <strong>This week</strong><p>${esc(w.gesture)}</p>${w.done ? `<p class="outcome">✓ ${esc(w.outcome || "tended")}</p>` : ""}</div>` : ""}
     ${p.pinned ? `<div class="sheet-box"><strong>Pinned</strong><p>${esc(p.pinned)}</p></div>` : ""}
     ${p.watch ? `<div class="sheet-box"><strong>Watching${p.watch.until ? ` until ${esc(day(p.watch.until))}` : ""}</strong><p>${esc(p.watch.why ?? "")}</p></div>` : ""}
+    ${rhythmBox(p.name)}
     <div class="ops sheet-ops">
       <button class="water" data-water="${n}">Tended</button>
       <button class="tiny" data-run="/beeper:thread-reply ${n}${w?.gesture ? ` — gesture: ${esc(w.gesture)}` : ""}">Write</button>
@@ -1095,6 +1161,7 @@ function openSheet(name) {
       ${p.linked ? `<a class="tiny btnlike" href="${obsidianLink(p.name)}">Open in Obsidian</a>` : ""}
     </div>`;
   $("#sheet").showModal();
+  loadRhythms();
 }
 
 /* ---------- tooltip ---------- */

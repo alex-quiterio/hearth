@@ -617,3 +617,16 @@ button.build:hover { border-color: var(--muted); }
   .talk-tip { max-width: calc(100vw - 16px); }
 }
 .talk-svg circle.hit, .talk-svg .row { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+/* Rhythms: who is around now, and each person's hours */
+.around { list-style: none; margin: 0 0 14px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
+.around li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; background: var(--surface-2); border-radius: 12px; padding: 8px 12px; font-size: 14px; }
+.around li small { flex-basis: 100%; color: var(--muted); font-size: 12.5px; }
+.around li button.name { border: 0; padding: 0; background: none; font: inherit; font-weight: 600; color: var(--ink); }
+.around .ring-tag { font-size: 11px; text-transform: lowercase; color: var(--ink-2); background: var(--surface); border-radius: 999px; padding: 0 7px; }
+.around li .tiny { margin-left: auto; }
+.spark { vertical-align: middle; }
+.spark rect { fill: var(--line); }
+.spark rect.peak { fill: var(--moss); }
+.spark rect.now { fill: var(--clay); }
+.rhythm-box p { margin: 6px 0 0; }

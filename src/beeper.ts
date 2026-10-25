@@ -249,3 +249,98 @@ export function unread(kin: { name: string; ring: string; aka?: string[] }[] = [
     db.close();
   }
 }
+
+// ---- Rhythms: when each kin person writes, and how fast each side answers ----------------
+// Timestamps only, over the last half year. Hours are this Mac's local time.
+
+export type Rhythm = {
+  name: string;
+  ring: string;
+  n: number; // their messages in the window
+  hours: number[]; // their messages per hour of the day, 0 to 23
+  weekdays: number[]; // their messages per weekday, Sunday first
+  peak: { from: number; to: number; share: number }; // the busiest three hours, `to` exclusive
+  theyAnswer: number | null; // median minutes from Alex's message to their next one
+  youAnswer: number | null; // median minutes from theirs to Alex's next one
+  lastReceived: number;
+  lift: number; // how much likelier than an even spread they are to write around this hour
+};
+export type Rhythms = { at: number; hour: number; people: Rhythm[]; around: string[] } | { error: string };
+
+const RHYTHM_DAYS = 182;
+const ANSWER_CAP = 3 * 86_400_000; // a gap longer than this is a new conversation, not an answer
+const RHYTHM_MIN = 12; // fewer messages than this says nothing about a rhythm
+
+const median = (xs: number[]) => {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b), m = s.length >> 1;
+  return Math.round((s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2) / 60_000);
+};
+
+type RhythmRow = { room: string; name: string | null; at: number; me: number };
+
+export function rhythms(kin: { name: string; ring: string; aka?: string[] }[] = [], file = BEEPER_DB, now = Date.now()): Rhythms {
+  let db: Database;
+  try {
+    db = new Database(file, { readonly: true });
+  } catch (e) {
+    return { error: `Beeper's index is not readable at ${file}: ${(e as Error).message}` };
+  }
+  try {
+    const rows = db
+      .query(
+        `select m.roomID room,
+           (select coalesce(nullif(p.full_name, ''), p.nickname) from participants p
+             where p.room_id = m.roomID and coalesce(p.is_self, 0) = 0 and coalesce(p.is_network_bot, 0) = 0 limit 1) name,
+           m.timestamp at, m.isSentByMe me
+         from mx_room_messages m join threads t on t.threadID = m.roomID
+         where json_extract(t.thread, '$.type') = 'single' and m.timestamp > ? and m.isDeleted = 0
+           and m.type in (${SPOKEN.map(() => "?").join(",")})
+         order by m.roomID, m.timestamp`,
+      )
+      .all(now - RHYTHM_DAYS * 86_400_000, ...SPOKEN) as RhythmRow[];
+    const match = kinMatch([...new Set(rows.flatMap((r) => (r.name ? [r.name] : [])))], kin);
+    type Acc = { ring: string; hours: number[]; weekdays: number[]; they: number[]; you: number[]; lastReceived: number };
+    const acc = new Map<string, Acc>();
+    let prev: RhythmRow | null = null;
+    for (const r of rows) {
+      const k = r.name ? match(r.name) : null;
+      if (prev?.room !== r.room) prev = null;
+      if (!k) { prev = r; continue; }
+      const a = acc.get(k.name) ?? { ring: k.ring, hours: Array(24).fill(0), weekdays: Array(7).fill(0), they: [], you: [], lastReceived: 0 };
+      if (!r.me) {
+        const d = new Date(r.at);
+        a.hours[d.getHours()]++;
+        a.weekdays[d.getDay()]++;
+        a.lastReceived = Math.max(a.lastReceived, r.at);
+      }
+      // The first message after the other side's: an answer, timed from their last line.
+      if (prev && prev.me !== r.me && r.at - prev.at <= ANSWER_CAP) (r.me ? a.you : a.they).push(r.at - prev.at);
+      acc.set(k.name, a);
+      prev = r;
+    }
+    const hour = new Date(now).getHours();
+    const people: Rhythm[] = [];
+    for (const [name, a] of acc) {
+      const n = a.hours.reduce((x, y) => x + y, 0);
+      if (n < RHYTHM_MIN) continue;
+      const three = (h: number) => a.hours[h % 24]! + a.hours[(h + 1) % 24]! + a.hours[(h + 2) % 24]!;
+      const from = [...Array(24).keys()].reduce((best, h) => (three(h) > three(best) ? h : best), 0);
+      const around = three((hour + 23) % 24); // this hour and one either side
+      people.push({
+        name, ring: a.ring, n, hours: a.hours, weekdays: a.weekdays,
+        peak: { from, to: (from + 3) % 24, share: Math.round((three(from) / n) * 100) / 100 },
+        theyAnswer: median(a.they), youAnswer: median(a.you), lastReceived: a.lastReceived,
+        lift: Math.round((around / n / (3 / 24)) * 10) / 10,
+      });
+    }
+    people.sort((a, b) => b.lift - a.lift || b.n - a.n);
+    // Around now: wrote in the last quarter hour, or this hour is well inside their usual ones.
+    const around = people.filter((p) => now - p.lastReceived < 15 * 60_000 || (p.lift >= 1.5 && p.n >= 20)).map((p) => p.name);
+    return { at: now, hour, people, around };
+  } catch (e) {
+    return { error: `Beeper's index changed shape: ${(e as Error).message}` };
+  } finally {
+    db.close();
+  }
+}
