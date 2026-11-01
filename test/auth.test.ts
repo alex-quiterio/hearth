@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { onThisMac } from "../src/auth";
+import { onThisMac } from "../src/access/auth";
 
 test("a visit from the Mac itself is local", () => {
   expect(onThisMac(new Request("http://127.0.0.1:4747/api/state"))).toBe(true);

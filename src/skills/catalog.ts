@@ -1,10 +1,12 @@
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { readdir } from "node:fs/promises";
 
-// The main menu: every buchecha skill, read from the plugin checkout, grouped by plugin.
+import { config } from "../config";
+import { frontmatterOf } from "../shared/note";
 
-export const PLUGINS_DIR = process.env.HEARTH_PLUGINS_DIR ?? join(homedir(), "code/alex-quiterio/buchecha/plugins");
+// The skill catalog: every buchecha skill, read from the plugin checkout, grouped by plugin. It is the main menu.
+
+export const PLUGINS_DIR = config.pluginsDir;
 
 // Group order and icons: the inner screen's plugins first, then as in the buchecha README. Unknown plugins follow, alphabetically.
 const GROUPS: Record<string, string> = {
@@ -27,16 +29,6 @@ export function hint(description: string): string {
   return first.length > 140 ? `${first.slice(0, 139).trimEnd()}…` : first;
 }
 
-function frontmatter(text: string): Record<string, any> {
-  const m = text.match(/^---\n([\s\S]*?)\n---/);
-  if (!m) return {};
-  try {
-    return (Bun.YAML.parse(m[1]!) as Record<string, any>) ?? {};
-  } catch {
-    return {};
-  }
-}
-
 export async function menu(dir = PLUGINS_DIR): Promise<MenuGroup[]> {
   let plugins: string[] = [];
   try {
@@ -57,7 +49,7 @@ export async function menu(dir = PLUGINS_DIR): Promise<MenuGroup[]> {
           skills.map(async (skill) => {
             const f = Bun.file(join(dir, plugin, "skills", skill, "SKILL.md"));
             if (!(await f.exists())) return null;
-            const fm = frontmatter(await f.text());
+            const fm = frontmatterOf(await f.text());
             const name = String(fm.name ?? skill);
             return { command: `/${plugin}:${name}`, name: name.replace(/-/g, " "), hint: hint(String(fm.description ?? "")) };
           }),

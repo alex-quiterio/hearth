@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { forecast, moonTurn } from "../src/forecast";
-import { state } from "../src/vault";
+import { forecast, moonTurn } from "../src/forecast/forecast";
+import { state } from "./helpers";
 
 const TODAY = "2026-10-09";
 const on = (f: ReturnType<typeof forecast>, date: string) => f.days.find((d) => d.date === date)!;

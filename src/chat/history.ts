@@ -1,5 +1,5 @@
 import { listSessions, getSessionMessages, deleteSession } from "@anthropic-ai/claude-agent-sdk";
-import { summarize } from "./agent";
+import { summarize } from "./tool-activity";
 
 // Past conversations are Claude Code sessions run from this repo; Hearth reads them back.
 

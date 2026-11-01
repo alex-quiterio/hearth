@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { join } from "node:path";
-import { menu, hint } from "../src/menu";
+import { menu, hint } from "../src/skills/catalog";
 
 const groups = await menu(join(import.meta.dir, "fixtures/plugins"));
 

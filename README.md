@@ -56,6 +56,30 @@ pandora vault ──read──▶ hearth (Bun server) ──▶ browser dashboar
   change under `## Changes`. The "Tend the hearth" button asks Claude to reshape it on
   purpose.
 
+## Code layout
+
+The backend is laid out domain first: one folder per bounded context, each with pure domain files and a repository for its IO.
+
+```
+src/
+  server.ts          composition root: find the vault, wire the adapters, serve
+  config.ts          every environment setting
+  shared/            dates, names, notes and sections, markdown rendering
+  vault/             the Vault port and its filesystem adapter, the folder layout, the watcher
+  kin/               Person, rings, the Kin map
+  conversations/     threads and their states, drafts waiting
+  tending/           the Tending log, and recording a tending (text in, text out)
+  garden/            thirst and the garden: plants, both clocks, this week, rhythm
+  inner/             proprioception, practice and spells, experiments, embers, thinking outputs
+  hearth/            Hearth.md as the dashboard's config
+  forecast/          the next 14 days and the moon
+  talk/              Beeper's index (adapter) and what its rows mean (shifts, unread, rhythms)
+  chat/              the permission policy, the Allow/Deny bridge, the Claude Code session, history
+  skills/ attachments/ access/
+  app/               dashboard (the read model) and tend (the one command)
+  http/              routes
+```
+
 ## Birthdays
 
 A Kin map line that says "birthday 31 Oct", "born 2 January 1990", "🎂 31 Oct" or "faz anos a 3 de

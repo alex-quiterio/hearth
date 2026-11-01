@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { state, md, servers, birthdayOf, draftsState } from "../src/vault";
+import { state } from "./helpers";
+import { md } from "../src/shared/markdown";
+import { servers } from "../src/hearth/hearth-config";
+import { birthdayOf } from "../src/kin/person";
+import { draftsWaiting } from "../src/app/dashboard";
+import { fsVault } from "../src/vault/vault";
+
+const draftsState = (root: string, today: string) => draftsWaiting(fsVault(root), today);
 
 const VAULT = join(import.meta.dir, "fixtures/vault");
 const s = await state(VAULT);

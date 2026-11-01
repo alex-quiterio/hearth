@@ -4,7 +4,7 @@ import { mkdtemp, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 process.env.HEARTH_ATTACH_DIR = await mkdtemp(join(tmpdir(), "hearth-attach-test-"));
-const { saveAttachment, vaultFile, sweepAttachments, ATTACH_DIR } = await import("../src/attach");
+const { saveAttachment, vaultFile, sweepAttachments, ATTACH_DIR } = await import("../src/attachments/attachments");
 
 const vault = resolve("test/fixtures/vault");
 const link = (file: string, v = "pandora") => `obsidian://open?vault=${v}&file=${encodeURIComponent(file)}`;

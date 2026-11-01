@@ -3,7 +3,7 @@ import { Database } from "bun:sqlite";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { talk, beeperOn, shifts, unread, rhythms } from "../src/beeper";
+import { talk, beeperOn, shifts, unread, rhythms } from "../src/talk/talk-service";
 
 // A tiny Beeper index with just the columns talk() reads.
 function fixture() {

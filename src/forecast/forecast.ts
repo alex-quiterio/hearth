@@ -1,6 +1,8 @@
 // The forecast: every dated thing the vault already holds, laid out over the days ahead.
 // Birthdays from the kin map, watch and Now dates from Hearth.md, listen dates from emergent experiments,
-// and the moon's turns. Read only, like the rest.
+// and the moon's turns. A pure domain service: it is handed the dates and lays them out.
+
+import { addDays, dateOf, DAY_MS } from "../shared/dates";
 
 export type ForecastEvent = {
   kind: "birthday" | "watch" | "now" | "listen";
@@ -27,14 +29,7 @@ type Input = {
 export const FORECAST_DAYS = 14;
 const CARRIED_WITHIN = 7; // days a passed date stays in "carried over" before it is left to Hearth.md
 
-const DAY = 86_400_000;
-const addDays = (date: string, n: number) => new Date(Date.parse(date) + n * DAY).toISOString().slice(0, 10);
-/** A YAML date, which may arrive as a string or a Date. */
-const dateOf = (v: unknown): string | null => {
-  if (v instanceof Date) return v.toISOString().slice(0, 10);
-  const m = typeof v === "string" ? v.match(/^\d{4}-\d{2}-\d{2}/) : null;
-  return m ? m[0] : null;
-};
+const DAY = DAY_MS;
 
 // Moon age in days since a known new moon (2000-01-06 18:14 UTC), synodic month 29.53 days.
 // The mean moon, as on the Inner sky: a turn can land a day off the almanac's.

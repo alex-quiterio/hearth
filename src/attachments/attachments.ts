@@ -1,11 +1,11 @@
-import { tmpdir } from "node:os";
 import { join, resolve, extname, sep } from "node:path";
 import { mkdir, readdir, stat, rm } from "node:fs/promises";
+import { config } from "../config";
 
 // Files dropped into the chat. The browser never reveals a file's path, so the page uploads the
 // bytes and Claude reads the copy here. Outside the repo, and swept after a day.
 
-export const ATTACH_DIR = process.env.HEARTH_ATTACH_DIR ?? join(tmpdir(), "hearth-attachments");
+export const ATTACH_DIR = config.attachDir;
 const MAX_BYTES = 50 * 1024 * 1024;
 const KEEP_MS = 24 * 3600 * 1000;
 

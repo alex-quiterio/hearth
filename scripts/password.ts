@@ -1,5 +1,5 @@
 // Set or change the Hearth password: bun run password. Changing it logs out every browser.
-import { setPassword, AUTH_FILE } from "../src/auth";
+import { setPassword, AUTH_FILE } from "../src/access/auth";
 
 // Read without echoing what is typed. One reader for both questions: a second for-await on stdin gets nothing.
 const tty = process.stdin.isTTY;

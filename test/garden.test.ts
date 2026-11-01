@@ -2,8 +2,17 @@ import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { cp, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { state, kinState, kinPeople } from "../src/vault";
-import { garden, isoWeek, mapDate, nextBirthday, openDrafts, thirstOf, threadSections, threadState, waterPlant } from "../src/garden";
+import { state, kinPeople } from "./helpers";
+import { fsVault } from "../src/vault/vault";
+import { isoWeek } from "../src/shared/dates";
+import { mapDate, nextBirthday } from "../src/kin/person";
+import { openDrafts, threadSections, threadState } from "../src/conversations/thread";
+import { thirstOf } from "../src/garden/thirst";
+import { gardenFor } from "../src/app/dashboard";
+import { waterPlant as water } from "../src/app/tend";
+import type { Person } from "../src/kin/person";
+
+const waterPlant = (root: string, p: Person, note: string, today: string) => water(fsVault(root), p, note, today);
 
 const FIXTURE = join(import.meta.dir, "fixtures/vault");
 const TODAY = "2026-10-09";
@@ -106,14 +115,14 @@ describe("each person's clocks", () => {
     await cp(FIXTURE, dir, { recursive: true });
     const map = await Bun.file(join(dir, KIN)).text();
     await Bun.write(join(dir, KIN), map.replace("Lena · ✈️ far (Berlin) · postcards.", "Lena · ✈️ far (Berlin) · every 3 weeks · reply within a day · postcards."));
-    const lena = kinPeople(await kinState(dir)).find((p) => p.name === "Lena")!;
+    const lena = (await kinPeople(dir)).find((p) => p.name === "Lena")!;
     expect(lena).toMatchObject({ every: 21, replyWithin: 1, note: "postcards." });
-    const ana = kinPeople(await kinState(dir)).find((p) => p.name === "Ana Exemplo")!;
+    const ana = (await kinPeople(dir)).find((p) => p.name === "Ana Exemplo")!;
     expect(ana).toMatchObject({ every: null, replyWithin: null, woe: "weekly call" });
   });
 
   test("their unanswered message runs the reply clock; the worse clock shows", async () => {
-    const people = kinPeople(await kinState(FIXTURE)).map((p) =>
+    const people = (await kinPeople(FIXTURE)).map((p) =>
       p.name === "Rui Teste" ? { ...p, replyWithin: 1 } : p.name === "Lena" ? { ...p, replyWithin: 7 } : p,
     );
     const chats = [
@@ -121,7 +130,7 @@ describe("each person's clocks", () => {
       { kin: "Lena", lastSent: NOW - 72 * H, lastReceived: NOW - 30 * H }, // 30h on a week
       { kin: "Tom Placeholder", lastSent: NOW - 2 * H, lastReceived: NOW - 30 * H }, // answered
     ];
-    const g = await garden(FIXTURE, people, { pinned: [], watch: [] }, TODAY, chats, NOW);
+    const g = await gardenFor(fsVault(FIXTURE), people, { pinned: [], watch: [] }, TODAY, chats, NOW);
     const p = (n: string) => g.plants.find((x) => x.name === n)!;
     // Rui was tended 2 days ago (fresh by pace), but his message is overdue.
     expect(p("Rui Teste")).toMatchObject({ waitingSince: NOW - 30 * H, thirst: "thirsty" });
@@ -134,7 +143,7 @@ describe("watering", () => {
   async function copy() {
     const dir = await mkdtemp(join(tmpdir(), "hearth-"));
     await cp(FIXTURE, dir, { recursive: true });
-    const people = kinPeople(await kinState(dir));
+    const people = (await kinPeople(dir));
     return { dir, who: (n: string) => people.find((p) => p.name === n)! };
   }
   const log = (dir: string) => Bun.file(join(dir, "4 - Archive/kin/Tending log.md")).text();

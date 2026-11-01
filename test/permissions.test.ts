@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { autoAllowed, covers, opensAt } from "../src/agent";
+import { autoAllowed, covers, opensAt } from "../src/chat/permission-policy";
 
 describe("what runs without asking", () => {
   test("reads and skills", () => {

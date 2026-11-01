@@ -1,11 +1,11 @@
 // A single password for the whole page. Its hash and the cookie-signing secret live outside the repo,
 // in ~/.config/hearth/auth.json, written by `bun run password`. No file: no login (127.0.0.1 only, as before).
 import { join } from "node:path";
-import { homedir } from "node:os";
 import { mkdir, chmod } from "node:fs/promises";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { config } from "../config";
 
-export const AUTH_FILE = process.env.HEARTH_AUTH_FILE ?? join(homedir(), ".config/hearth/auth.json");
+export const AUTH_FILE = config.authFile;
 const COOKIE = "hearth_session";
 const DAYS = 365; // remembered for a year on each browser, through server restarts
 
