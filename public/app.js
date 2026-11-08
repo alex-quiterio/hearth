@@ -999,7 +999,7 @@ function coordinationSection() {
 function notesSection() {
   const n = S.innerScreen?.notes ?? [];
   if (!n.length) return "";
-  return `<section class="panel"><h2>Lately thought</h2><ul class="notes">${n.map((x) =>
+  return `<section class="panel"><h2>Lately thought and made</h2><ul class="notes">${n.map((x) =>
     `<li><a href="${obsidianLink(x.name)}">${esc(x.name)}</a> <span class="muted">${esc(new Date(x.mtime).toISOString().slice(0, 10))}</span></li>`).join("")}</ul></section>`;
 }
 
