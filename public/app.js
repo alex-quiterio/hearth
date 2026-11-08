@@ -963,7 +963,7 @@ window.addEventListener("hashchange", () => { showScreen(); window.scrollTo(0, 0
 // The skills this screen launches, from the menu when it has loaded, else a fixed few.
 const INNER_FALLBACK = [
   ["/inner-work:jung-therapist", "Jung session"], ["/inner-work:proprioception", "Proprioception"],
-  ["/inner-work:journal-therapist", "Journal patterns"], ["/thinking:emergent-practice", "A practice for today"],
+  ["/inner-work:jung-therapist analyze my journal", "Journal patterns"], ["/thinking:emergent-practice", "A practice for today"],
   ["/thinking:emergent", "Unstick a plan"], ["/thinking:atomic-notes", "Atomic notes"],
   ["/readings:tarot", "Tarot"],
 ];
